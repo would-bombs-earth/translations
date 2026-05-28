@@ -344,7 +344,7 @@ translations_pro/
   "content_security_policy": {
     "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src *"
   } 
-}
+} 
 ```
   
 `connect-src: *` 是必需的——Service Worker 需要 fetch 用户配置的任意 Worker URL。`alarms` 权限用于心跳域名同步的定时触发。
