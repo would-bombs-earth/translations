@@ -284,141 +284,7 @@ async function translateViaEngine(text, sl, domain, engine) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 双引擎协同翻译 — 按 marker 条目平量拆分，两引擎并行处理各一半
-// ═══════════════════════════════════════════════════════════
-
-async function collaborativeTranslate(clean, sl, domain, tabId, groupId) {
-    // 解析所有 marker 条目
-    const entryRegex = new RegExp(
-        MARK_L + '(\\d+)' + MARK_R + '[\\s\\S]*?(?=' + MARK_L + '\\d+' + MARK_R + '|$)',
-        'g'
-    );
-    const entries = [];
-    let m;
-    while ((m = entryRegex.exec(clean)) !== null) {
-        entries.push({ id: parseInt(m[1], 10), text: m[0] });
-    }
-
-    if (entries.length === 0) {
-        // 无 marker — 降级为微软单引擎，结果推送到 content script
-        try {
-            const result = await enqueueFetch(() => translateViaEngine(clean, sl, domain, 'microsoft'));
-            if (result?.translation && tabId) {
-                chrome.tabs.sendMessage(tabId, {
-                    action: 'apply_translation',
-                    translation: result.translation,
-                    engine: 'microsoft',
-                    groupId: groupId
-                }).catch(() => {});
-            }
-        } catch (e) {
-            ERR('MS 降级失败:', e?.message || String(e));
-        }
-        return;
-    }
-
-    // 按文本长度降序排列，贪心分配 → 两个引擎拿到总量接近的文本
-    entries.sort((a, b) => b.text.length - a.text.length);
-    const msEntries = [];
-    const wkEntries = [];
-    let msLen = 0, wkLen = 0;
-    for (const entry of entries) {
-        if (msLen <= wkLen) {
-            msEntries.push(entry);
-            msLen += entry.text.length;
-        } else {
-            wkEntries.push(entry);
-            wkLen += entry.text.length;
-        }
-    }
-
-    const msText = msEntries.map(e => e.text).join('\n');
-    const wkText = wkEntries.map(e => e.text).join('\n');
-
-    LOG('协同翻译(流式): MS ' + msEntries.length + '条(' + msText.length + '字) | WK '
-        + wkEntries.length + '条(' + wkText.length + '字) | sl=' + sl);
-
-    // 辅助：分块后并行发送
-    async function translateWithChunking(text, engine) {
-        if (!text) return '';
-        const chunks = splitMarkerChunks(text, GOOGLE_LIMIT);
-        if (chunks.length === 1) {
-            const r = await enqueueFetch(() => translateViaEngine(chunks[0], sl, domain, engine));
-            return r?.translation || '';
-        }
-        const results = await Promise.all(
-            chunks.map(chunk =>
-                enqueueFetch(() => translateViaEngine(chunk, sl, domain, engine))
-                    .catch(e => { ERR(engine + ' chunk failed:', e?.message || String(e)); return null; })
-            )
-        );
-        return results.filter(Boolean).map(r => r.translation).filter(Boolean).join('\n');
-    }
-
-    // 辅助：翻译文本并通过 sendMessage 推送结果到 content script
-    async function translateAndPush(text, engine) {
-        if (!text) return { ok: true, engine, text: '' };
-        try {
-            const result = await translateWithChunking(text, engine);
-            if (result && tabId) {
-                chrome.tabs.sendMessage(tabId, {
-                    action: 'apply_translation',
-                    translation: result,
-                    engine: engine,
-                    groupId: groupId
-                }).catch(() => {});
-            }
-            return { ok: true, engine, text: result };
-        } catch (e) {
-            ERR(engine + ' 失败:', e?.message || String(e));
-            return { ok: false, engine, text: '', error: e };
-        }
-    }
-
-    // 并行启动两个引擎，各自完成后立即推送结果
-    const [msOutcome, wkOutcome] = await Promise.all([
-        translateAndPush(msText, 'microsoft'),
-        translateAndPush(wkText, 'worker-proxy')
-    ]);
-
-    // 容错：一个引擎挂了，另一个接管它的部分
-    if (!msOutcome.ok && wkOutcome.ok && msText) {
-        LOG('MS 失败 → WK 接管 MS 部分');
-        try {
-            const retry = await translateWithChunking(msText, 'worker-proxy');
-            if (retry && tabId) {
-                chrome.tabs.sendMessage(tabId, {
-                    action: 'apply_translation',
-                    translation: retry,
-                    engine: 'worker-proxy',
-                    groupId: groupId
-                }).catch(() => {});
-            }
-        } catch (e) { ERR('WK 重试失败:', e?.message || String(e)); }
-    }
-
-    if (!wkOutcome.ok && msOutcome.ok && wkText) {
-        LOG('WK 失败 → MS 接管 WK 部分');
-        try {
-            const retry = await translateWithChunking(wkText, 'microsoft');
-            if (retry && tabId) {
-                chrome.tabs.sendMessage(tabId, {
-                    action: 'apply_translation',
-                    translation: retry,
-                    engine: 'microsoft',
-                    groupId: groupId
-                }).catch(() => {});
-            }
-        } catch (e) { ERR('MS 重试失败:', e?.message || String(e)); }
-    }
-
-    if (!msOutcome.ok && !wkOutcome.ok) {
-        ERR('双引擎全部失败');
-    }
-}
-
-// ═══════════════════════════════════════════════════════════
-// 主翻译入口 (export) — 智能路由
+// 主翻译入口 (export) — 单引擎模式，用户自行选择
 // ═══════════════════════════════════════════════════════════
 
 export async function google(text, sl = 'auto', domain = '', tabId = null, groupId = null) {
@@ -430,23 +296,36 @@ export async function google(text, sl = 'auto', domain = '', tabId = null, group
         return { translation: cached, engine: '(cache)' };
     }
 
-    const { url } = await getWorkerConfig();
-    const hasWorker = !!url;
+    // 读取用户选择的引擎，默认 Worker 代理
+    const { selectedEngine } = await chrome.storage.local.get('selectedEngine');
+    let engine = selectedEngine || 'worker-proxy';
 
-    // Worker 可用 → 双引擎协同，流式推送结果
-    if (hasWorker) {
-        collaborativeTranslate(clean, sl, domain, tabId, groupId).catch(e => {
-            ERR('协同翻译失败:', e?.message || String(e));
-        });
-        return { accepted: true };
+    // 如果选了 Worker 但未配置，降级到微软
+    if (engine === 'worker-proxy') {
+        const { url } = await getWorkerConfig();
+        if (!url) {
+            LOG('Worker 未配置，降级到微软翻译');
+            engine = 'microsoft';
+        }
     }
 
-    // 无 Worker → 微软单引擎
+    // 单引擎翻译（含大文本分块）
     let result;
     try {
-        result = await enqueueFetch(() => translateViaEngine(clean, sl, domain, 'microsoft'));
+        result = await translateWithChunking(clean, sl, domain, engine);
     } catch (e) {
-        ERR('Microsoft 失败:', e?.message || String(e));
+        ERR(engine + ' 翻译失败:', e?.message || String(e));
+        // 尝试降级到另一引擎
+        const fallback = engine === 'microsoft' ? 'worker-proxy' : 'microsoft';
+        try {
+            const { url: fbUrl } = await getWorkerConfig();
+            if (fallback === 'worker-proxy' && !fbUrl) throw new Error('Worker 未配置');
+            LOG(engine + ' 失败 → 降级到 ' + fallback);
+            result = await translateWithChunking(clean, sl, domain, fallback);
+            engine = fallback;
+        } catch (e2) {
+            ERR('降级也失败:', e2?.message || String(e2));
+        }
     }
 
     if (!result?.translation) {
@@ -454,7 +333,25 @@ export async function google(text, sl = 'auto', domain = '', tabId = null, group
     }
 
     cacheSet(cacheKey, result.translation);
-    return { translation: result.translation, engine: 'microsoft' };
+    return { translation: result.translation, engine: engine };
+}
+
+// ── 单引擎翻译 + 大文本自动分块 ──
+async function translateWithChunking(text, sl, domain, engine) {
+    const chunks = splitMarkerChunks(text, GOOGLE_LIMIT);
+    if (chunks.length === 1) {
+        return await enqueueFetch(() => translateViaEngine(chunks[0], sl, domain, engine));
+    }
+    LOG('大文本分块: ' + chunks.length + ' 块, engine=' + engine);
+    const results = await Promise.all(
+        chunks.map(chunk =>
+            enqueueFetch(() => translateViaEngine(chunk, sl, domain, engine))
+                .catch(e => { ERR(engine + ' chunk:', e?.message || String(e)); return null; })
+        )
+    );
+    const valid = results.filter(Boolean).map(r => r.translation).filter(Boolean);
+    if (!valid.length) throw new Error('all chunks failed');
+    return { translation: valid.join('\n'), engine: engine };
 }
 
 // ═══════════════════════════════════════════════════════════
