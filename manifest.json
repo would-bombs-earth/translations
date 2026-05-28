@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "极译",
+  "version": "1.0.3",
+  "description": "智能多引擎网页翻译",
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "contextMenus",
+    "scripting",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>",
+    "https://api.cognitive.microsofttranslator.com/*",
+    "https://edge.microsoft.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "options.html",
+    "default_title": "极译",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "debug.js",
+        "content-globals.js",
+        "content-lang.js",
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false,
+      "match_about_blank": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src *"
+  },
+  "minimum_chrome_version": "110"
+}

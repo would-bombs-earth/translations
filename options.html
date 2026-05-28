@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>极译</title>
+  <style>
+    /* ══════════════════════════════════════════════ */
+    /* 模仿配色 · 极简黑曜石与苹果绿 (Graphite & iOS Green) */
+    /* ══════════════════════════════════════════════ */
+    :root {
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --glass-bg-hover: linear-gradient(90deg, rgba(82, 53, 31, 0.5) 0%, rgba(33, 26, 21, 0.5) 100%);
+      --glass-bg-active: rgba(255, 255, 255, 0.15);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-border-hover: rgba(230, 126, 34, 0.7);
+      --glass-blur: 20px;
+      --text: #eeeeee;
+      --sub: #8e8e93;
+      --accent: #30d158;
+      --accent2: #34c759;
+      --accent-glow: rgba(48, 209, 88, .2);
+      --green: #30d158;
+      --radius: 8px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      width: 340px;
+      min-height: 320px;
+      max-height: 600px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      color-scheme: dark;
+      background-color: rgba(18, 18, 20, 0.6) !important;
+      backdrop-filter: blur(20px) !important;
+      -webkit-backdrop-filter: blur(20px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 20px 20px 36.3px 0px rgba(0, 0, 0, 0.45);
+      border-radius: 10px;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      color-scheme: dark;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      border: none;
+      padding-bottom: 0;
+      background-color: transparent !important;
+      box-sizing: border-box;
+    }
+
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* ── 顶部品牌 ── */
+    .profile {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px 8px;
+      position: relative;
+    }
+
+    .profile::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 16px;
+      right: 16px;
+      height: 1px;
+      background: linear-gradient(90deg,
+          transparent, rgba(255, 255, 255, .05), transparent);
+    }
+
+    .profile-name {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #ffffff;
+    }
+
+    .profile-sub {
+      font-size: 10.5px;
+      color: var(--sub);
+      line-height: 1.2;
+    }
+
+    /* ── 菜单容器 ── */
+    .menu {
+      padding: 6px 10px 12px;
+    }
+
+    /* ── 菜单项 ── */
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 12px;
+      border-radius: var(--radius);
+      cursor: default;
+      transition: background .2s, border-color .2s;
+      min-height: 48px;
+      margin: 3px 0;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+
+    .menu-item.clickable {
+      cursor: pointer;
+    }
+
+    .menu-item.clickable:hover {
+      background: var(--glass-bg-hover);
+      border-color: var(--glass-border-hover);
+      box-shadow: 0 0 10px rgba(230, 126, 34, 0.3);
+    }
+
+    .menu-item.clickable:active {
+      background: var(--glass-bg-active);
+    }
+
+    .menu-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: transparent !important;
+      border: none !important;
+      color: #98989e !important;
+      box-shadow: none !important;
+    }
+
+    .menu-icon svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .menu-item:hover .menu-icon.blue {
+      color: #0a84ff !important;
+    }
+
+    .menu-item:hover .menu-icon.accent {
+      color: #30d158 !important;
+    }
+
+    .menu-item:hover .menu-icon.green {
+      color: #30d158 !important;
+    }
+
+    .menu-item:hover .menu-icon.rose {
+      color: #ff453a !important;
+    }
+
+    .menu-item:hover .menu-icon.purple {
+      color: #bf5af2 !important;
+    }
+
+    .menu-icon.accent,
+    .menu-icon.blue,
+    .menu-icon.green,
+    .menu-icon.purple,
+    .menu-icon.rose {
+      background: transparent !important;
+      color: #98989e !important;
+      border: none !important;
+    }
+
+    .menu-label {
+      font-size: 13.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: 0.02em;
+    }
+
+    .menu-sub {
+      font-size: 11px;
+      color: var(--sub);
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    /* ── 帮助提示图标 ── */
+    .help-tip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid rgba(255, 255, 255, .08);
+      color: var(--sub);
+      font-size: 10px;
+      font-weight: 600;
+      cursor: help;
+      flex-shrink: 0;
+      margin-left: 6px;
+      vertical-align: middle;
+      transition: background .2s, color .2s, border-color .2s;
+    }
+
+    .help-tip:hover {
+      background: rgba(255, 122, 0, .15);
+      color: var(--accent);
+      border-color: rgba(255, 122, 0, .25);
+    }
+
+    .help-tip .help-text {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 15, 18, .98);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, .08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .5);
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .help-tip .help-text::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(255, 255, 255, .08);
+    }
+
+    .help-tip:hover .help-text {
+      display: block;
+    }
+
+    .menu-chevron {
+      color: rgba(255, 255, 255, .2);
+      flex-shrink: 0;
+      transition: transform .25s;
+      display: flex;
+      align-items: center;
+    }
+
+    .menu-item.open .menu-chevron {
+      transform: rotate(90deg);
+      color: var(--accent2);
+    }
+
+    /* ── 分割线 ── */
+    .menu-divider {
+      height: 2px;
+      margin: 0;
+      background: transparent;
+    }
+
+    /* ── 子内容 ── */
+    .menu-sub-content {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      padding: 0 12px 0 56px;
+      transition: max-height .3s ease, opacity .25s ease, padding .3s ease;
+    }
+
+    .menu-sub-content.show {
+      max-height: 320px;
+      opacity: 1;
+      padding: 6px 12px 8px 56px;
+    }
+
+    /* ── 状态信号图标 ── */
+    #stateIcon {
+      color: #98989e;
+      transition: color 0.3s, filter 0.3s;
+    }
+
+    #stateIcon.on {
+      color: var(--green) !important;
+      filter: drop-shadow(0 0 6px rgba(48, 209, 88, 0.6));
+    }
+
+    /* ── Toggle ── */
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      display: none;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: #39393d;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+      border: 1px solid #39393d;
+    }
+
+    .toggle-slider::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+      transition: transform .2s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    .toggle input:checked+.toggle-slider {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-color: var(--accent);
+      box-shadow: none;
+    }
+
+    .toggle input:checked+.toggle-slider::before {
+      transform: translateX(18px);
+    }
+
+    /* ── 引擎卡片 ── */
+    .eng-cards {
+      display: flex;
+      gap: 6px;
+      padding: 4px 0px;
+    }
+
+    .eng-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 6px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      transition: background .2s, border-color .2s, transform .2s;
+      position: relative;
+      min-width: 0;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+
+    .eng-card:hover {
+      background: var(--glass-bg-hover);
+      border-color: var(--glass-border-hover);
+      box-shadow: 0 0 10px rgba(230, 126, 34, 0.3);
+    }
+
+    .eng-card:active {
+      transform: scale(.97);
+    }
+
+    .eng-card.selected {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(0, 198, 255, .04), rgba(0, 114, 255, .04));
+    }
+
+    .eng-card.selected::before {
+      content: "● 当前";
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      font-size: 8px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .eng-card-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .eng-card-icon.ms {
+      background: linear-gradient(135deg, rgba(129, 140, 248, .22), rgba(99, 102, 241, .16));
+      color: #818cf8;
+      border: 1px solid rgba(129, 140, 248, .18);
+    }
+
+    .eng-card-icon.worker {
+      background: linear-gradient(135deg, rgba(245, 158, 11, .22), rgba(217, 119, 6, .16));
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, .18);
+    }
+
+    .eng-card-icon.dual {
+      background: linear-gradient(135deg, rgba(139, 92, 246, .22), rgba(99, 102, 241, .16));
+      color: #8b5cf6;
+      border: 1px solid rgba(139, 92, 246, .18);
+    }
+
+    .eng-card-icon svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .eng-card-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .eng-card-latency {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .eng-card-latency.testing {
+      color: var(--sub);
+    }
+
+    .eng-card-latency.fast {
+      color: var(--green);
+    }
+
+    .eng-card-latency.mid {
+      color: #ffa726;
+    }
+
+    .eng-card-latency.slow {
+      color: #ef5350;
+    }
+
+    .eng-card-latency.dead {
+      color: rgba(255, 255, 255, .2);
+    }
+
+    /* ── Worker 配置 ── */
+    #workerContent.show {
+      padding: 4px 12px 8px;
+    }
+
+    .worker-cfg-row {
+      margin-bottom: 6px;
+    }
+
+    .worker-cfg-row label {
+      display: block;
+      font-size: 10.5px;
+      color: var(--sub);
+      margin-bottom: 3px;
+      letter-spacing: 0.03em;
+    }
+
+    .worker-cfg-row .input-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .worker-cfg-row input {
+      width: 100%;
+      height: 28px;
+      border: 1px solid var(--glass-border);
+      border-radius: 7px;
+      padding: 0 28px 0 10px;
+      font-size: 11px;
+      background: var(--glass-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, background .2s;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+
+    .worker-cfg-row input:focus {
+      border-color: rgba(226, 123, 67, .4);
+      background: var(--glass-bg-hover);
+    }
+
+    .worker-cfg-row input::placeholder {
+      color: rgba(44, 30, 21, .3);
+    }
+
+    .worker-cfg-hint {
+      font-size: 10px;
+      color: var(--sub);
+      opacity: .6;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .worker-cfg-btn {
+      width: 100%;
+      height: 30px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), #db2777);
+      box-shadow: 0 4px 12px rgba(226, 123, 67, .2);
+      transition: opacity .2s, box-shadow .2s;
+    }
+
+    .worker-cfg-btn:hover {
+      opacity: .85;
+      box-shadow: 0 4px 14px rgba(226, 123, 67, .25);
+    }
+
+    /* ── 底部异常提示 ── */
+    #netError {
+      display: none;
+      padding: 10px 14px 12px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #ef5350;
+    }
+
+    #netError.show {
+      display: block;
+    }
+
+    /* ── 引擎延迟 ── */
+    #engineContent {
+      padding-left: 12px;
+    }
+
+    #engineContent.show {
+      padding-left: 12px;
+    }
+
+    .eng-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 2px;
+      margin-bottom: 4px;
+    }
+
+    .eng-table tr {
+      background: var(--glass-bg);
+      border-radius: 6px;
+      transition: background .2s;
+    }
+
+    .eng-table tr:hover {
+      background: var(--glass-bg-hover);
+    }
+
+    .eng-table tr[data-engine] {
+      cursor: pointer;
+    }
+
+    .eng-table tr.eng-selected {
+      background: rgba(226, 123, 67, .08);
+      border: 1px solid rgba(226, 123, 67, .25);
+    }
+
+    .eng-table tr.eng-selected:hover {
+      background: rgba(226, 123, 67, .12);
+    }
+
+    .eng-table td {
+      padding: 6px 8px;
+      font-size: 11.5px;
+      vertical-align: middle;
+    }
+
+    .eng-table td:first-child {
+      border-radius: 6px 0 0 6px;
+      width: 24px;
+      text-align: center;
+      color: var(--sub);
+      font-size: 10px;
+      opacity: .6;
+    }
+
+    .eng-table td:nth-child(2) {
+      color: var(--text);
+    }
+
+    .eng-table td:last-child {
+      border-radius: 0 6px 6px 0;
+      text-align: right;
+      font-weight: 700;
+      font-size: 12px;
+      min-width: 55px;
+    }
+
+    .eng-best {
+      margin-left: 4px;
+      font-size: 10px;
+      color: var(--green);
+    }
+
+    .eng-pick {
+      margin-left: 4px;
+      font-size: 10px;
+      color: #f59e0b;
+    }
+
+    .eng-ms-fast {
+      color: var(--green);
+    }
+
+    .eng-ms-mid {
+      color: #ffa726;
+    }
+
+    .eng-ms-slow {
+      color: #ef5350;
+    }
+
+    .eng-ms-dead {
+      color: rgba(255, 255, 255, .2);
+    }
+
+    .eng-empty {
+      font-size: 11px;
+      color: var(--sub);
+      text-align: center;
+      padding: 8px 0;
+      opacity: .6;
+    }
+
+    /* ── 域名表格 ── */
+    #domainContent {
+      padding-left: 12px;
+      overflow-y: auto;
+    }
+
+    #domainContent.show {
+      padding-left: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .domain-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 2px;
+      margin-bottom: 8px;
+    }
+
+    .domain-table tr {
+      background: var(--glass-bg);
+      border-radius: 6px;
+      transition: background .2s;
+    }
+
+    .domain-table tr:hover {
+      background: var(--glass-bg-hover);
+    }
+
+    .domain-table td {
+      padding: 6px 8px;
+      font-size: 11.5px;
+      vertical-align: middle;
+    }
+
+    .domain-table td:first-child {
+      border-radius: 6px 0 0 6px;
+      width: 24px;
+      text-align: center;
+      color: var(--sub);
+      font-size: 10px;
+      opacity: .6;
+    }
+
+    .domain-table td:nth-child(2) {
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .domain-table td:last-child {
+      border-radius: 0 6px 6px 0;
+      width: 28px;
+      text-align: center;
+    }
+
+    .domain-table .del {
+      cursor: pointer;
+      color: var(--sub);
+      opacity: .4;
+      font-size: 12px;
+      transition: opacity .2s, color .2s;
+      line-height: 1;
+    }
+
+    .domain-table .del:hover {
+      opacity: 1;
+      color: #ef5350;
+    }
+
+    .domain-empty {
+      font-size: 11px;
+      color: var(--sub);
+      text-align: center;
+      padding: 8px 0;
+      opacity: .6;
+    }
+
+    .domain-table mark {
+      background: rgba(226, 123, 67, .25);
+      color: var(--accent);
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    /* ── 域名输入 ── */
+    .domain-row {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 6px;
+    }
+
+    .domain-row .input-wrap {
+      flex: 1;
+      position: relative;
+    }
+
+    .domain-row .input-wrap input {
+      width: 100%;
+      height: 30px;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 0 28px 0 10px;
+      font-size: 12px;
+      background: var(--glass-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, background .2s;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+
+    .domain-row .input-wrap input:focus {
+      border-color: rgba(226, 123, 67, .4);
+      background: var(--glass-bg-hover);
+    }
+
+    .domain-row .input-wrap input::placeholder {
+      color: rgba(44, 30, 21, .3);
+    }
+
+    .input-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 15px;
+      height: 15px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.45);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.2s ease;
+    }
+
+    .input-clear svg {
+      width: 9px;
+      height: 9px;
+      display: block;
+      stroke: currentColor;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    .input-clear:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      transform: translateY(-50%) scale(1.15);
+    }
+
+    .input-clear:active {
+      transform: translateY(-50%) scale(0.9);
+    }
+
+    .input-clear.show {
+      display: flex;
+    }
+
+    .domain-row .btn-icon {
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      background: var(--glass-bg);
+      color: #98989e;
+      padding: 0;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+    }
+
+    .domain-row .btn-icon svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
+
+    .domain-row .btn-icon:hover {
+      background: var(--glass-bg-hover);
+      border-color: var(--glass-border-hover);
+      color: #ffffff;
+      transform: scale(1.04);
+      box-shadow: 0 0 10px rgba(230, 126, 34, 0.3);
+    }
+
+    .domain-row .btn-icon:active {
+      transform: scale(0.96);
+    }
+
+    .domain-row .btn-site svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* ── 状态提示 ── */
+    #status {
+      min-height: 18px;
+      padding: 8px 14px 12px;
+      text-align: center;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--green);
+    }
+
+    #status.err {
+      color: #ef5350;
+    }
+
+    /* ── 禁用态 ── */
+    .menu-item.disabled {
+      opacity: .4;
+      pointer-events: none;
+    }
+
+    /* ── 自定义极速提示 ── */
+    .custom-tooltip {
+      position: fixed;
+      background: rgba(20, 20, 25, 0.98);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 400;
+      line-height: 1.5;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      white-space: nowrap;
+      z-index: 9999;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, 4px);
+      transition: opacity 0.08s ease, transform 0.08s ease;
+    }
+
+    .custom-tooltip.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .custom-tooltip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: var(--chevron-offset, 50%);
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(20, 20, 25, 0.98);
+    }
+
+    /* ── 底部提示（朝上箭头）── */
+    .custom-tooltip.bottom {
+      transform: translate(-50%, -4px);
+    }
+
+    .custom-tooltip.bottom.show {
+      transform: translate(-50%, 0);
+    }
+
+    .custom-tooltip.bottom::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: rgba(20, 20, 25, 0.98);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="profile">
+    <div class="profile-name">极译</div>
+    <div class="profile-sub">智能多引擎网页翻译</div>
+  </div>
+  <div class="menu">
+    <div class="menu-item">
+      <span class="menu-icon" id="stateIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">当前页面<span class="help-tip">?<span class="help-text">显示当前网页的翻译状态</span></span> <span
+            id="stateText" style="font-weight: 600;">查询中…</span></span>
+      </div>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item">
+      <span class="menu-icon blue"><svg viewBox="0 0 24 24">
+          <path d="M21.5 2v6h-6" />
+          <path d="M2.5 22v-6h6" />
+          <path d="M21.34 15.57a10 10 0 0 1-17.56 2.18" />
+          <path d="M2.66 8.43a10 10 0 0 1 17.56-2.18" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">自动翻译<span class="help-tip">?<span class="help-text">打开页面时自动翻译外文内容</span></span></span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="autoTranslate" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="menu-item clickable" id="action">
+      <span class="menu-icon accent"><svg viewBox="0 0 24 24">
+          <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor" stroke="none" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label"><span id="actionLabel">翻译此页</span><span class="help-tip">?<span
+              class="help-text">手动翻译/恢复当前网页的文本内容</span></span></span>
+      </div>
+      <span class="menu-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg></span>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item clickable" id="engineToggle">
+      <span class="menu-icon green"><svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          <path d="M2 12h20" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">翻译引擎<span class="help-tip">?<span class="help-text">选择要使用的翻译服务<br>支持微软翻译与 Worker
+              代理</span></span></span>
+      </div>
+      <span class="menu-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg></span>
+    </div>
+    <div class="menu-sub-content" id="engineContent">
+      <!-- 引擎卡片 — 双引擎协同 -->
+      <div class="eng-cards">
+        <div class="eng-card" id="cardDual">
+          <div class="eng-card-icon dual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="17 1 21 5 17 9"/>
+              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <polyline points="7 23 3 19 7 15"/>
+              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg></div>
+          <div class="eng-card-name">双引擎协同</div>
+          <div class="eng-card-latency testing" id="latencyDualMs">MS —</div>
+          <div class="eng-card-latency testing" id="latencyDualWk">WK —</div>
+        </div>
+      </div>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item clickable" id="domainToggle">
+      <span class="menu-icon rose"><svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" />
+          <path d="m4.9 4.9 14.2 14.2" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">排除域名<span class="help-tip">?<span class="help-text">这些域名下的页面不会自动翻译<br><span
+                id="domainCount">0 个域名</span></span></span></span>
+      </div>
+      <span class="menu-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg></span>
+    </div>
+    <div class="menu-sub-content" id="domainContent">
+      <div class="domain-row">
+        <div class="input-wrap">
+          <input type="text" id="domainInput" placeholder="example.com">
+          <button class="input-clear" id="domainClear" type="button" data-tooltip="清空输入"><svg viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg></button>
+        </div>
+        <button class="btn-icon btn-site" id="domainAddCurrent" data-tooltip="添加当前站点"><svg viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg></button>
+        <button class="btn-icon btn-add" id="domainAdd" data-tooltip="添加输入域名"><svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg></button>
+      </div>
+      <div id="domainList"></div>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item clickable" id="workerToggle">
+      <span class="menu-icon purple"><svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">Worker 配置<span class="help-tip">?<span class="help-text">自建 Cloudflare Worker
+              代理翻译请求<br>部署后在此填入 URL 和 Token</span></span></span>
+      </div>
+      <span class="menu-chevron"><svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+          <path d="M1 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg></span>
+    </div>
+    <div class="menu-sub-content" id="workerContent">
+      <div class="worker-cfg-row">
+        <label for="workerUrl">Worker URL</label>
+        <div class="input-wrap">
+          <input type="text" id="workerUrl" placeholder="https://translate.your-domain.com">
+          <button class="input-clear" id="workerUrlClear" type="button" data-tooltip="清空输入"><svg viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg></button>
+        </div>
+      </div>
+      <div class="worker-cfg-row">
+        <label for="workerToken">Auth Token</label>
+        <div class="input-wrap">
+          <input type="text" id="workerToken" placeholder="你的 AUTH_TOKEN">
+          <button class="input-clear" id="workerTokenClear" type="button" data-tooltip="清空输入"><svg viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg></button>
+        </div>
+      </div>
+      <button class="worker-cfg-btn" id="workerSave">保存配置</button>
+    </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item clickable" id="exportLogs">
+      <span class="menu-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg></span>
+      <div class="menu-body">
+        <span class="menu-label">导出日志<span class="help-tip">?<span class="help-text">收集所有日志 (页面 + 后台) 并下载为文本文件</span></span></span>
+      </div>
+    </div>
+  </div>
+  <div id="status"></div>
+  <div id="netError">⚠️ 当前网络异常，所有翻译引擎均不可用，请检查网络后刷新页面重试</div>
+  <div id="tooltip" class="custom-tooltip"></div>
+  <script src="options.js"></script>
+</body>
+
+</html>
