@@ -56,6 +56,7 @@ async function syncDomainsFromCloud() {
     }
     return false;
   } catch (_) {
+    ERR('心跳同步失败:', _?.message || String(_ || 'unknown'));
     return false;
   }
 }
@@ -232,24 +233,26 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
     return true;
   }
 
-  // 翻译请求 → 委托给 background-api.js（双引擎流式推送）
+  // 翻译请求 → 委托给 background-api.js（单引擎模式）
   if (req.type === 'translate') {
     const tabId = sender.tab?.id;
+    // CR-1: 建立 keepAlive 连接，防止 SW 在翻译中途被终止
+    const ka = chrome.runtime.connect({ name: 'keepAlive' });
+    const releaseKA = () => { try { ka.disconnect(); } catch (_) { } };
+    // 超时保护：120s 后强制释放
+    const timeoutId = setTimeout(() => { releaseKA(); sendResponse({ error: '翻译超时，请重试' }); }, 120000);
+    const finalize = (resp) => { clearTimeout(timeoutId); setTimeout(releaseKA, 200); sendResponse(resp); };
+
     LOG('收到翻译请求, sl=', req.sl, 'text长度=', (req.text || '').length);
 
     google(req.text || '', req.sl || 'auto', req.domain, tabId, req.groupId)
       .then(r => {
-        if (r.accepted) {
-          LOG('翻译已受理, 流式推送中');
-          sendResponse({ accepted: true });
-        } else {
-          LOG('翻译成功, 结果长度=', (r.translation || '').length);
-          sendResponse(r);
-        }
+        LOG('翻译成功, 引擎=', r.engine, '结果长度=', (r.translation || '').length);
+        finalize(r);
       })
       .catch(e => {
         ERR('翻译失败:', e?.message || String(e));
-        sendResponse({ error: e?.message || String(e) });
+        finalize({ error: e?.message || String(e) });
       });
 
     return true;
@@ -267,8 +270,15 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.type === 'worker_config_updated') {
     _asleep = false;
     _stableCount = 0;
-    syncDomainsFromCloud().catch(() => {});
-    setAlarmPeriod(FAST_MINUTES).catch(() => {});
+    syncDomainsFromCloud().catch(() => { });
+    setAlarmPeriod(FAST_MINUTES).catch(() => { });
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  // 引擎选择变更 — 记录到 storage（popup 已写入，此处做日志）
+  if (req.type === 'engine_selected') {
+    LOG('引擎切换:', req.engine);
     sendResponse({ ok: true });
     return false;
   }

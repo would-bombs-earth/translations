@@ -31,7 +31,8 @@ function normalize(text) {
 const CJK_RE = /[\u4E00-\u9FFF\u3400-\u4DBF\uF900-\uFAFF]/;
 const KANA_RE = /[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\uFF65-\uFF9F]/;
 const HANGUL_RE = /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/;
-const FOREIGN_RE = /[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/;
+// ME-7: 同步生产代码的 FOREIGN_RE (content-lang.js:6-26) 中的拉丁/扩展字符范围
+const FOREIGN_RE = /[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u0100-\u017F\u0180-\u024F\u1E00-\u1EFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]/;
 
 // ── SKIP_RE (简化) ──
 const SKIP_RE = /^(?:@[\w.-]+|https?:\/\/\S+|\d[\d.,]*[KkMmBb]?)$/;
@@ -234,4 +235,3 @@ if (FAIL === 0) {
   console.log(FAIL + ' TEST(S) FAILED \u2717');
   process.exit(1);
 }
-

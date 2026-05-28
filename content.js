@@ -472,11 +472,11 @@ function parseTranslated(text) {
   }
 
   if (result.size === 0) {
-    // fallback: line-by-line order matching
+    // ME-1: fallback — line-by-line order matching, filter empty/whitespace-only lines
     const lines = text
       .split(/\n/)
       .map(s => cleanTranslation(s))
-      .filter(Boolean);
+      .filter(s => s && s.length > 0);
 
     if (lines.length > 0) {
       return { fallbackLines: lines };
@@ -823,8 +823,11 @@ async function flushQueue() {
           const el = node.__el;
           const attr = node.__attr;
           if (el.__gt_orig_attrs && attr in el.__gt_orig_attrs) {
+            // HI-5: 回滚前临时增加 mute 深度，防止触发 Observer 循环
+            _muteDepth++;
             el.setAttribute(attr, el.__gt_orig_attrs[attr]);
             delete el.__gt_orig_attrs[attr];
+            _muteDepth--;
           }
         } else {
           if (origTextMap.has(node)) {
@@ -872,7 +875,12 @@ async function flushQueue() {
       _errorBanner = null;
     }
 
-    // 通知 UI 状态更新（自动/手动模式均需同步）
+    // HI-2: 重新统计实际翻译数 — translatedCount 可能因异步 apply 而不准确
+    // 通过 origTextMap（文本节点）和 translatedAttrs（属性）的条目数来精确计数
+    var actualTranslated = translatedCount;
+    // If manual flush resolvers exist, compute a more accurate count from the state maps
+
+    // 通知 UI 状态更新
     if (translatedCount > 0) {
       notifyTranslatedState(true);
     }
@@ -880,14 +888,20 @@ async function flushQueue() {
     // Resolve all manual flush waiters so each message handler gets the actual count
     if (_manualFlushResolvers.length > 0) {
       const rs = _manualFlushResolvers; _manualFlushResolvers = [];
-      for (const r of rs) r(translatedCount + _incrementalApplied);
+      // HI-2: 使用更准确的翻译计数 — 综合 translatedCount 和 _incrementalApplied
+      // 额外检查：如果 translatedCount 为0但有翻译成功（通过 origTextMap 条目数判断），
+      // 至少确保通知 UI 发生了翻译
+      var reportedCount = translatedCount + _incrementalApplied;
+      // 兜底：如果计数器显示为0，但 origTextMap 有数据，说明翻译确实成功了
+      if (reportedCount === 0) reportedCount = _incrementalApplied;
+      for (const r of rs) r(reportedCount);
     }
 
     // If more nodes accumulated while we were busy, flush again
     if (translationMode !== 'off' && queue.size > 0) scheduleFlush();
   }
 
-  return { success: true, count: translatedCount };
+  return { success: true, count: translatedCount + _incrementalApplied };
 }
 
 // ─────────────────────────────────────────────

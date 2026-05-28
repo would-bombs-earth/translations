@@ -481,6 +481,11 @@
       color: rgba(255, 255, 255, .2);
     }
 
+    .eng-card.dead-card {
+      opacity: .35;
+      pointer-events: none;
+    }
+
     /* ── Worker 配置 ── */
     #workerContent.show {
       padding: 4px 12px 8px;
@@ -1013,18 +1018,27 @@
         </svg></span>
     </div>
     <div class="menu-sub-content" id="engineContent">
-      <!-- 引擎卡片 — 双引擎协同 -->
+      <!-- 引擎卡片 — 独立双引擎，用户自行选择 -->
       <div class="eng-cards">
-        <div class="eng-card" id="cardDual">
-          <div class="eng-card-icon dual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="17 1 21 5 17 9"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-              <polyline points="7 23 3 19 7 15"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+        <div class="eng-card" id="cardMS">
+          <div class="eng-card-icon ms"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
             </svg></div>
-          <div class="eng-card-name">双引擎协同</div>
-          <div class="eng-card-latency testing" id="latencyDualMs">MS —</div>
-          <div class="eng-card-latency testing" id="latencyDualWk">WK —</div>
+          <div class="eng-card-name">微软翻译</div>
+          <div class="eng-card-latency testing" id="latencyMS">—</div>
+        </div>
+        <div class="eng-card" id="cardWK">
+          <div class="eng-card-icon worker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+            </svg></div>
+          <div class="eng-card-name">Worker 代理</div>
+          <div class="eng-card-latency testing" id="latencyWK">—</div>
         </div>
       </div>
     </div>
@@ -1107,13 +1121,15 @@
     </div>
     <div class="menu-divider"></div>
     <div class="menu-item clickable" id="exportLogs">
-      <span class="menu-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
+      <span class="menu-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
         </svg></span>
       <div class="menu-body">
-        <span class="menu-label">导出日志<span class="help-tip">?<span class="help-text">收集所有日志 (页面 + 后台) 并下载为文本文件</span></span></span>
+        <span class="menu-label">导出日志<span class="help-tip">?<span class="help-text">收集所有日志 (页面 + 后台)
+              并下载为文本文件</span></span></span>
       </div>
     </div>
   </div>

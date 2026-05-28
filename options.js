@@ -8,10 +8,13 @@ const actionLabel = $('actionLabel');
 const statusEl = $('status');
 const stateIcon = $('stateIcon');
 const stateText = $('stateText');
-const cardDual = $('cardDual');
-const latencyDualMs = $('latencyDualMs');
-const latencyDualWk = $('latencyDualWk');
+const cardMS = $('cardMS');
+const cardWK = $('cardWK');
+const latencyMS = $('latencyMS');
+const latencyWK = $('latencyWK');
 const netError = $('netError');
+
+let selectedEngine = 'worker-proxy'; // 默认 Worker 代理
 
 let currentTabId = null;
 let isTranslated = false;
@@ -28,24 +31,36 @@ function latencyClass(ms) {
   return 'dead';
 }
 
+function renderEngineSelection() {
+  cardMS.classList.toggle('selected', selectedEngine === 'microsoft');
+  cardWK.classList.toggle('selected', selectedEngine === 'worker-proxy');
+}
+
+async function selectEngine(engine) {
+  if (selectedEngine === engine) return;
+  selectedEngine = engine;
+  renderEngineSelection();
+  await chrome.storage.local.set({ selectedEngine: engine });
+  // 通知 background 刷新引擎选择
+  chrome.runtime.sendMessage({ type: 'engine_selected', engine: engine }).catch(() => { });
+  showStatus(engine === 'microsoft' ? '✅ 已切换至微软翻译' : '✅ 已切换至 Worker 代理');
+}
+
 async function pingAndRender() {
   const { workerUrl } = await chrome.storage.local.get('workerUrl');
 
-  latencyDualMs.textContent = 'MS —';
-  latencyDualMs.className = 'eng-card-latency testing';
-  latencyDualWk.textContent = 'WK —';
-  latencyDualWk.className = 'eng-card-latency testing';
-  cardDual.classList.remove('selected');
+  // 重置 MS 卡片
+  latencyMS.textContent = '—';
+  latencyMS.className = 'eng-card-latency testing';
+  cardMS.classList.remove('dead-card');
+  // 重置 WK 卡片
+  latencyWK.textContent = '—';
+  latencyWK.className = 'eng-card-latency testing';
+  cardWK.classList.remove('dead-card');
   netError.classList.remove('show');
 
-  if (!workerUrl) {
-    latencyDualMs.textContent = 'MS —';
-    latencyDualMs.className = 'eng-card-latency testing';
-    latencyDualWk.textContent = 'WK 未配置';
-    latencyDualWk.className = 'eng-card-latency dead';
-    netError.classList.add('show');
-    return;
-  }
+  // 恢复已选引擎高亮
+  renderEngineSelection();
 
   try {
     const resp = await chrome.runtime.sendMessage({ type: 'ping_engines' });
@@ -58,39 +73,38 @@ async function pingAndRender() {
     const msResult = results.find(r => r.name === 'microsoft');
     const workerResult = results.find(r => r.name === 'worker-proxy');
 
-    // 渲染微软延迟
+    // 渲染微软卡片
     if (msResult?.ok) {
-      latencyDualMs.textContent = 'MS ' + msResult.ms + 'ms';
-      latencyDualMs.className = 'eng-card-latency ' + latencyClass(msResult.ms);
-      latencyDualMs.removeAttribute('data-tooltip');
+      latencyMS.textContent = msResult.ms + 'ms';
+      latencyMS.className = 'eng-card-latency ' + latencyClass(msResult.ms);
+      latencyMS.removeAttribute('data-tooltip');
     } else {
-      latencyDualMs.textContent = 'MS 不可用';
-      latencyDualMs.className = 'eng-card-latency dead';
-      if (msResult?.error) latencyDualMs.setAttribute('data-tooltip', msResult.error);
+      latencyMS.textContent = '不可用';
+      latencyMS.className = 'eng-card-latency dead';
+      cardMS.classList.add('dead-card');
+      if (msResult?.error) latencyMS.setAttribute('data-tooltip', msResult.error);
     }
 
-    // 渲染 Worker 延迟
+    // 渲染 Worker 卡片
     if (workerResult?.ok) {
-      latencyDualWk.textContent = 'WK ' + workerResult.ms + 'ms';
-      latencyDualWk.className = 'eng-card-latency ' + latencyClass(workerResult.ms);
-      latencyDualWk.removeAttribute('data-tooltip');
+      latencyWK.textContent = workerResult.ms + 'ms';
+      latencyWK.className = 'eng-card-latency ' + latencyClass(workerResult.ms);
+      latencyWK.removeAttribute('data-tooltip');
     } else {
-      latencyDualWk.textContent = 'WK 不可用';
-      latencyDualWk.className = 'eng-card-latency dead';
-      if (workerResult?.error) latencyDualWk.setAttribute('data-tooltip', workerResult.error);
+      latencyWK.textContent = workerUrl ? '不可用' : '未配置';
+      latencyWK.className = 'eng-card-latency dead';
+      if (!workerUrl) {
+        cardWK.classList.add('dead-card');
+      }
+      if (workerResult?.error) latencyWK.setAttribute('data-tooltip', workerResult.error);
     }
 
     const msOk = msResult?.ok;
     const wkOk = workerResult?.ok;
 
-    if (msOk && wkOk) {
-      cardDual.classList.add('selected');
-    } else if (!msOk && !wkOk) {
+    if (!msOk && !wkOk) {
       netError.classList.add('show');
       actionBtn.classList.add('disabled');
-    } else {
-      // 部分可用 — 仍然 selected，但提示降级
-      cardDual.classList.add('selected');
     }
   } catch (e) {
     showBothDead();
@@ -98,13 +112,26 @@ async function pingAndRender() {
 }
 
 function showBothDead() {
-  latencyDualMs.textContent = 'MS 不可用';
-  latencyDualMs.className = 'eng-card-latency dead';
-  latencyDualWk.textContent = 'WK 不可用';
-  latencyDualWk.className = 'eng-card-latency dead';
+  latencyMS.textContent = '不可用';
+  latencyMS.className = 'eng-card-latency dead';
+  cardMS.classList.add('dead-card');
+  latencyWK.textContent = '不可用';
+  latencyWK.className = 'eng-card-latency dead';
+  cardWK.classList.add('dead-card');
   netError.classList.add('show');
   actionBtn.classList.add('disabled');
 }
+
+// ══════════════════════════════════════════════════════
+// ── 初始化 ──
+// ══════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════
+// ── 引擎卡片点击 ──
+// ══════════════════════════════════════════════════════
+
+cardMS.addEventListener('click', () => selectEngine('microsoft'));
+cardWK.addEventListener('click', () => selectEngine('worker-proxy'));
 
 // ══════════════════════════════════════════════════════
 // ── 初始化 ──
@@ -126,6 +153,13 @@ function showBothDead() {
 
     const { autoTranslate } = await chrome.storage.sync.get('autoTranslate');
     autoChk.checked = autoTranslate !== false;
+
+    // 恢复用户上次选择的引擎
+    const { selectedEngine: stored } = await chrome.storage.local.get('selectedEngine');
+    if (stored === 'microsoft' || stored === 'worker-proxy') {
+      selectedEngine = stored;
+    }
+    renderEngineSelection();
 
     isTranslated = await getTabTranslatedState(currentTabId);
 
@@ -438,7 +472,9 @@ function renderDomains(filter) {
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
     const escapedD = escapeHtml(d);
-    const display = filter ? escapedD.replace(new RegExp('(' + filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>') : escapedD;
+    // LO-4: 预计算安全正则模式
+    var safePattern = filter ? filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
+    const display = filter ? escapedD.replace(new RegExp('(' + safePattern + ')', 'gi'), '<mark>$1</mark>') : escapedD;
     html += '<tr><td>' + (i + 1) + '</td><td>' + display + '</td><td><span class="del" data-domain="' + escapedD + '">✕</span></td></tr>';
   }
   html += '</table>';
@@ -458,9 +494,12 @@ async function addDomain(d) {
   _domainBusy = true;
   try {
     d = String(d || '').trim().toLowerCase();
-    if (!d || !d.includes('.')) return;
-    if (domains.includes(d)) {
+    if (!d || !d.includes('.')) { _domainBusy = false; return; }
+    // ME-6: 使用 Set 进行去重检查，避免 TOCTOU 竞态
+    var domainSet = new Set(domains);
+    if (domainSet.has(d)) {
       showStatus('⚠️ 域名已存在', true);
+      _domainBusy = false;
       return;
     }
     domains.push(d);
@@ -517,7 +556,7 @@ function _applyPendingCloudDomains() {
     }
     if (changed) {
       domains.sort();
-      saveDomains().catch(() => {});
+      saveDomains().catch(() => { });
       renderDomains(domainInput.value.trim());
     }
   }

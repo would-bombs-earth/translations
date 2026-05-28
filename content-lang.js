@@ -92,8 +92,9 @@ function isAlreadyChinese(text) {
 
     // 含中文 + 仅数字/单位后缀 → 视为中文 (如 "491K 字幕", "148M 次观看")
     if (anyCjk && anyForeign && maxForeignRun <= 2) {
-        // 检查是否有真正的英文单词 (3+连续字母) 或缩写 (I'm, U.S., a.m., don't)
-        var hasRealWord = /[a-zA-Z]{3,}/.test(text);
+        // ME-2: 检查是否有真正的英文单词 (2+连续字母) 或缩写
+        // 降低阈值从3到2，避免 "pH", "AI" 等短单词被误判为中文
+        var hasRealWord = /[a-zA-Z]{2,}/.test(text);
         var hasAbbrev = /[a-zA-Z][.'][a-zA-Z]/.test(text);
         if (!hasRealWord && !hasAbbrev) return true;
     }
@@ -156,8 +157,10 @@ function isPageSimplifiedChinese() {
             var parent = node.parentElement;
             if (!parent) return NodeFilter.FILTER_REJECT;
             var tag = parent.tagName;
+            // ME-3: 跳过导航和页眉页脚元素，避免采样偏差
             if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT' ||
-                tag === 'SVG' || tag === 'IFRAME' || tag === 'CODE' || tag === 'PRE') {
+                tag === 'SVG' || tag === 'IFRAME' || tag === 'CODE' || tag === 'PRE' ||
+                tag === 'NAV' || tag === 'HEADER' || tag === 'FOOTER') {
                 return NodeFilter.FILTER_REJECT;
             }
             // 快速隐藏检测：offsetParent 为 null 且不是 fixed/absolute 定位 → 不可见

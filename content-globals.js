@@ -125,7 +125,12 @@ var SEEN_CLEAN = 1000;
 var seenText = new Set();
 
 function seenAdd(text) {
-    if (seenText.has(text)) return false;
+    // ME-4: LRU-style eviction — re-add to mark as recently used
+    if (seenText.has(text)) {
+        seenText.delete(text);
+        seenText.add(text);
+        return false;
+    }
     if (seenText.size >= SEEN_MAX) {
         var iter = seenText.values();
         for (var i = 0; i < SEEN_CLEAN; i++) {
