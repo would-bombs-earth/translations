@@ -228,7 +228,9 @@ function scanInitial(skipHydration) {
     scheduleFlush();
   };
 
-  if (delay > 0) {
+  if (tMode === 'manual') {
+    doScan();
+  } else if (delay > 0) {
     LOG_DOM('检测到 SPA 框架，延迟' + delay + 'ms 等待水合完成');
     setTimeout(() => {
       if (typeof requestIdleCallback === 'function') {
@@ -313,6 +315,7 @@ let flushTimer = null;
 function scheduleFlush() {
   if (tMode === 'off') return;
   if (translating || flushTimer || !isAlive()) return;
+  if (tMode === 'manual') { flushQueue(); return; }
   flushTimer = setTimeout(() => {
     flushTimer = null;
     if (isAlive() && tMode !== 'off') flushQueue();
