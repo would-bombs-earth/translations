@@ -289,6 +289,46 @@ kvCfgImportInput.addEventListener('change', async () => {
 });
 
 
+const oxfordAppIdInput = $('oxfordAppId');
+const oxfordAppKeyInput = $('oxfordAppKey');
+const oxfordStatusBadge = $('oxfordStatusBadge');
+const oxfordBox = $('oxfordBox');
+const oxfordHeader = $('oxfordHeader');
+
+async function loadOxfordConfig() {
+  const data = await chrome.storage.local.get(['oxfordAppId', 'oxfordAppKey']);
+  if (data.oxfordAppId) oxfordAppIdInput.value = data.oxfordAppId;
+  if (data.oxfordAppKey) oxfordAppKeyInput.value = data.oxfordAppKey;
+  updateOxfordStatus(data.oxfordAppId, data.oxfordAppKey);
+}
+
+function updateOxfordStatus(id, key) {
+  if (id && key) {
+    oxfordStatusBadge.className = 'kv-status-badge ok';
+    oxfordStatusBadge.textContent = '已配置';
+  } else {
+    oxfordStatusBadge.className = 'kv-status-badge idle';
+    oxfordStatusBadge.textContent = '未配置';
+  }
+}
+
+if (oxfordHeader) {
+  oxfordHeader.addEventListener('click', () => {
+    oxfordBox.classList.toggle('open');
+  });
+}
+
+async function saveOxfordConfig() {
+  const id = oxfordAppIdInput.value.trim();
+  const key = oxfordAppKeyInput.value.trim();
+  await chrome.storage.local.set({ oxfordAppId: id, oxfordAppKey: key });
+  updateOxfordStatus(id, key);
+}
+
+if (oxfordAppIdInput) oxfordAppIdInput.addEventListener('blur', saveOxfordConfig);
+if (oxfordAppKeyInput) oxfordAppKeyInput.addEventListener('blur', saveOxfordConfig);
+
+loadOxfordConfig();
 loadKvConfig();
 
 async function getTabTranslatedState(tabId) {
@@ -659,6 +699,7 @@ domainInput.addEventListener('keydown', e => {
 (function setupToggles() {
   const groups = [
     { toggle: $('engineToggle'), content: $('engineContent') },
+    { toggle: $('dictToggle'), content: $('dictContent') },
     { toggle: $('domainToggle'), content: $('domainContent') },
   ].filter(g => g.toggle && g.content);
 

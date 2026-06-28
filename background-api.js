@@ -423,14 +423,8 @@ async function translateViaGoogle(texts, sl) {
 // 单词词典查询 — 获取翻译 + 词性标注
 // ═══════════════════════════════════════════════════════════
 
-export async function lookupWord(text) {
-    var clean = sanitizeText(text.trim());
-    if (!clean || !/^[a-zA-Z-]+$/.test(clean) || clean.length > 40) {
-        return { translation: '', dict: null };
-    }
-
+async function lookupWordGoogle(clean) {
     var url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=zh-CN&dt=t&dt=bd&q=' + encodeURIComponent(clean);
-
     for (var retry = 0; retry < 2; retry++) {
         try {
             var res = await fetch(url);
@@ -445,7 +439,6 @@ export async function lookupWord(text) {
             var raw = await res.text();
             var data = JSON.parse(raw);
 
-            // Extract translation
             var translation = '';
             if (Array.isArray(data) && Array.isArray(data[0])) {
                 for (var j = 0; j < data[0].length; j++) {
@@ -453,17 +446,14 @@ export async function lookupWord(text) {
                 }
             }
 
-            // Extract dictionary / POS data
-            // Google API: data[1] = dictionary entries
-            // Each entry: [pos_cn, [meanings], [synonyms], word, score]
             var dict = null;
             if (Array.isArray(data) && Array.isArray(data[1]) && data[1].length > 0) {
                 dict = [];
                 for (var di = 0; di < data[1].length; di++) {
                     var entry = data[1][di];
                     if (!Array.isArray(entry) || entry.length < 2) continue;
-                    var posLabel = entry[0];  // "名词", "动词", etc.
-                    var meanings = entry[1];  // ["炸弹","轰炸","弹"]
+                    var posLabel = entry[0];
+                    var meanings = entry[1];
                     if (typeof posLabel !== 'string' || !Array.isArray(meanings)) continue;
                     if (meanings.length === 0) continue;
                     dict.push({ pos: posLabel, meanings: meanings.slice(0, 5) });
@@ -478,6 +468,72 @@ export async function lookupWord(text) {
         }
     }
     return { translation: '', dict: null };
+}
+
+async function lookupWordOxford(word, appId, appKey) {
+    var url = 'https://od-api.oxforddictionaries.com/api/v2/translations/en/zh/' + encodeURIComponent(word.toLowerCase());
+    try {
+        var res = await fetch(url, {
+            headers: {
+                'app_id': appId,
+                'app_key': appKey
+            }
+        });
+        if (!res.ok) return null;
+        var data = await res.json();
+        
+        var dict = [];
+        var firstTranslation = '';
+        
+        if (data.results && data.results[0] && data.results[0].lexicalEntries) {
+            data.results[0].lexicalEntries.forEach(le => {
+                var pos = le.lexicalCategory ? le.lexicalCategory.text.toLowerCase() : '';
+                var meanings = [];
+                if (le.entries) {
+                    le.entries.forEach(e => {
+                        if (e.senses) {
+                            e.senses.forEach(s => {
+                                if (s.translations) {
+                                    s.translations.forEach(t => {
+                                        if (t.text) {
+                                            meanings.push(t.text);
+                                            if (!firstTranslation) firstTranslation = t.text;
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                }
+                if (pos && meanings.length > 0) {
+                    var uniqueMeanings = Array.from(new Set(meanings)).slice(0, 5);
+                    dict.push({ pos: pos, meanings: uniqueMeanings });
+                }
+            });
+        }
+        
+        if (dict.length > 0) {
+            return { translation: firstTranslation || word, dict: dict };
+        }
+    } catch (e) {}
+    return null;
+}
+
+export async function lookupWord(text) {
+    var clean = sanitizeText(text.trim());
+    if (!clean || !/^[a-zA-Z-]+$/.test(clean) || clean.length > 40) {
+        return { translation: '', dict: null };
+    }
+
+    try {
+        const conf = await chrome.storage.local.get(['oxfordAppId', 'oxfordAppKey']);
+        if (conf.oxfordAppId && conf.oxfordAppKey) {
+            const ox = await lookupWordOxford(clean, conf.oxfordAppId, conf.oxfordAppKey);
+            if (ox && ox.dict) return ox;
+        }
+    } catch (_) {}
+
+    return await lookupWordGoogle(clean);
 }
 
 // ═══════════════════════════════════════════════════════════
