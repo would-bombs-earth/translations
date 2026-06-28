@@ -1087,7 +1087,8 @@ function showSelPopup(rawText, transText, dictData) {
     if (oldBod) {
       oldBod.textContent = transText;
       oldBod.style.color = transText === '翻译中...' ? 'rgba(255,255,255,0.4)' :
-        transText.indexOf('翻译失败') === 0 ? '#f87171' : '#f0f0f5';
+        transText.indexOf('翻译失败') === 0 ? '#f87171' : '#00ff41';
+      oldBod.style.textShadow = (transText === '翻译中...' || transText.indexOf('翻译失败') === 0) ? 'none' : '0 0 8px rgba(0,255,65,0.4)';
     }
     var oldSrc = _selPopup.querySelector('.__gt_src');
     if (oldSrc) oldSrc.textContent = rawText;
@@ -1175,7 +1176,8 @@ function showSelPopup(rawText, transText, dictData) {
   bod.style.cssText =
     'font-size:15px;font-weight:500;line-height:1.5;' +
     'word-break:break-word;white-space:pre-wrap;' +
-    'color:' + (isError ? '#f87171' : isLoading ? 'rgba(255,255,255,0.4)' : '#f0f0f5') + ';';
+    'color:' + (isError ? '#f87171' : isLoading ? 'rgba(255,255,255,0.4)' : '#00ff41') + ';' +
+    ((!isError && !isLoading) ? 'text-shadow:0 0 8px rgba(0,255,65,0.4);' : '');
   bod.textContent = transText;
   popup.appendChild(bod);
 
