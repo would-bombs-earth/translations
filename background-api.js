@@ -538,6 +538,7 @@ export async function lookupWord(text) {
         var dRes = results[1];
 
         var dict = null;
+        var youdaoMeanings = [];
         if (dRes && dRes.ec && dRes.ec.word && dRes.ec.word[0] && dRes.ec.word[0].trs) {
             dict = [];
             var POS_MAP = { 'n.':'noun','v.':'verb','vt.':'verb','vi.':'verb','adj.':'adjective','adv.':'adverb','prep.':'preposition','conj.':'conjunction','pron.':'pronoun','interj.':'interjection','art.':'article','num.':'noun','int.':'interjection','pl.':'noun' };
@@ -548,15 +549,20 @@ export async function lookupWord(text) {
                     var posMatch = rawStr.match(/^([a-zA-Z]+\.)\s*(.+)$/);
                     if (posMatch) {
                         dict.push({ pos: POS_MAP[posMatch[1]] || posMatch[1], meanings: [posMatch[2]] });
+                        youdaoMeanings.push(posMatch[2]);
                     } else {
                         dict.push({ pos: "", meanings: [rawStr] });
+                        youdaoMeanings.push(rawStr);
                     }
                 }
             }
             if (dict.length === 0) dict = null;
         }
 
-        return { translation: tRes.translation || clean, dict: dict };
+        var translation = youdaoMeanings.length > 0
+            ? youdaoMeanings.join('；')
+            : (tRes.translation || clean);
+        return { translation: translation, dict: dict };
     } catch (e) {
         return { translation: clean, dict: null };
     }
