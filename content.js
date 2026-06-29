@@ -63,6 +63,9 @@ function processElementAttrs(el, onlyAttr) {
     const val = el.getAttribute(attr);
     if (!val) continue;
 
+    if (attr === 'value' && el.tagName !== 'INPUT') continue;
+    if (attr === 'value' && !isButtonInput(el)) continue;
+
     const text = normalize(val);
     if (text.length < 2) continue;
     if (SKIP_RE.test(text)) continue;
@@ -123,6 +126,7 @@ function processTextNode(node) {
   if (tMode === 'off') return;
   if (!node.parentElement) return;
   if (!node.parentElement.__gtSafe && isSkippable(node.parentElement)) return;
+  if (isSvgMeta(node.parentElement)) return;
 
   diag.scanned++;
   const raw = node.textContent;
@@ -233,7 +237,7 @@ function scanInitial() {
 // Shared mutation handler used for both main DOM and shadow-root observers
 function onMutation(mutations) {
   if (tMode === 'off') return;
-  if (_muteDepth > 0) return;
+  if (_muteDepth > 0) { _missedMutations = true; return; }
   for (const m of mutations) {
     if (m.type === 'childList') {
       for (const n of m.addedNodes) enqueueNode(n);
@@ -279,7 +283,7 @@ function startObserver() {
     subtree: true,
     characterData: true,
     attributes: true,
-    attributeFilter: ['title', 'alt', 'placeholder', 'aria-label']
+    attributeFilter: ['title', 'alt', 'placeholder', 'aria-label', 'aria-description', 'aria-roledescription', 'aria-valuetext', 'label', 'value']
   });
 }
 
@@ -308,6 +312,8 @@ function scheduleFlush() {
 
 function clearPendingWork() {
   queue.clear();
+  _pendingWrites.length = 0;
+  _rafScheduled = false;
   if (flushTimer) {
     clearTimeout(flushTimer);
     flushTimer = null;
@@ -675,10 +681,9 @@ async function flushQueue() {
       for (const node of queuedNodes) {
         if (!node?.parentElement) continue;
 
-        const raw = normalize(node.textContent);
+        const raw = node.__gtRaw || normalize(node.textContent);
         if (!raw) continue;
 
-        // Snapshot the text 鈥?downstream code uses this, not a re-read from DOM
         node.__gtRaw = raw;
         // Also capture the restore target NOW, before the page can modify it.
         // applyTranslation itself won't overwrite this unless unregisterTextRestore
@@ -1399,20 +1404,24 @@ function flushPrefetch() {
   if (current.length) batches.push(current);
 
   batches.forEach(b => {
-    chrome.runtime.sendMessage({
-      type: 'translate',
-      domain: location.hostname,
-      text: b.map(x => x.payload).join('\n')
-    }, response => {
-      if (response && response.translation) {
-        const resMap = parseTranslated(response.translation);
-        b.forEach(item => {
-          if (resMap.has(item.id)) {
-            cacheSet(item.raw, resMap.get(item.id));
-          }
-        });
-      }
-    });
+    if (!isAlive()) return;
+    try {
+      chrome.runtime.sendMessage({
+        type: 'translate',
+        domain: location.hostname,
+        text: b.map(x => x.payload).join('\n')
+      }, response => {
+        if (chrome.runtime.lastError) return;
+        if (response && response.translation) {
+          const resMap = parseTranslated(response.translation);
+          b.forEach(item => {
+            if (resMap.has(item.id)) {
+              cacheSet(item.raw, resMap.get(item.id));
+            }
+          });
+        }
+      });
+    } catch (_) {}
   });
 }
 

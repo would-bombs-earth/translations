@@ -88,9 +88,9 @@ function _dbg(event, data) {
 
 // ── 跳过标签 ──
 var SKIP_TAGS = new Set([
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'INPUT',
-    'CODE', 'PRE', 'SVG', 'IFRAME', 'CANVAS',
-    'VIDEO', 'AUDIO', 'OBJECT', 'SELECT', 'TEMPLATE'
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA',
+    'CODE', 'PRE', 'IFRAME', 'CANVAS',
+    'VIDEO', 'AUDIO', 'OBJECT', 'TEMPLATE'
 ]);
 
 // ── 调优参数 ──
@@ -113,7 +113,7 @@ function _isDomainExcluded(hostname) {
     }
     return false;
 }
-var KANA_RE = /[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\uFF65-\uFF9F]/;
+var KANA_RE = /[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF\uFF65-\uFF9F\u3005\u3031-\u3035]/;
 var HANGUL_RE = /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/;
 
 // ── 标记 ──
@@ -397,5 +397,17 @@ function querySelectorAllDeep(root, selector) {
 }
 
 // ── 可翻译属性 ──
-var TRANSLATABLE_ATTRS = ['title', 'alt', 'placeholder', 'aria-label'];
+var TRANSLATABLE_ATTRS = ['title', 'alt', 'placeholder', 'aria-label', 'aria-description', 'aria-roledescription', 'aria-valuetext', 'label', 'value'];
+
+function isButtonInput(el) {
+    if (!el || el.tagName !== 'INPUT') return false;
+    var type = (el.getAttribute('type') || 'text').toLowerCase();
+    return type === 'submit' || type === 'button' || type === 'reset';
+}
+
+function isSvgMeta(el) {
+    if (!el || el.namespaceURI !== 'http://www.w3.org/2000/svg') return false;
+    var tag = el.tagName.toLowerCase();
+    return tag === 'title' || tag === 'desc';
+}
 var translatedAttrs = new WeakMap();

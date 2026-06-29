@@ -67,18 +67,37 @@ function isAlreadyChinese(text, node) {
     }
 
     if (isConservative) {
-        var hasKanaHangul = false;
+        var hasClearForeign = false;
         for (const ch of text) {
             var c = ch.codePointAt(0);
             if ((c >= 0x3040 && c <= 0x309F) || (c >= 0x30A0 && c <= 0x30FF) ||
                 (c >= 0x31F0 && c <= 0x31FF) || (c >= 0xFF65 && c <= 0xFF9F) ||
                 (c >= 0xAC00 && c <= 0xD7AF) || (c >= 0x1100 && c <= 0x11FF) ||
-                (c >= 0x3130 && c <= 0x318F)) {
-                hasKanaHangul = true; break;
+                (c >= 0x3130 && c <= 0x318F) ||
+                c === 0x3005 || (c >= 0x3031 && c <= 0x3035) || // Japanese marks (々, 〱-〵)
+                (c >= 0x0400 && c <= 0x052F) || // Cyrillic
+                (c >= 0x0600 && c <= 0x06FF) || // Arabic
+                (c >= 0x0E00 && c <= 0x0E7F) || // Thai
+                (c >= 0x0900 && c <= 0x097F) || // Devanagari
+                (c >= 0x0980 && c <= 0x09FF) || // Bengali
+                (c >= 0x0B80 && c <= 0x0BFF) || // Tamil
+                (c >= 0x0370 && c <= 0x03FF) || // Greek
+                (c >= 0x0590 && c <= 0x05FF) || // Hebrew
+                (c >= 0x10A0 && c <= 0x10FF) || // Georgian
+                (c >= 0x1000 && c <= 0x109F) || // Myanmar
+                (c >= 0x1780 && c <= 0x17FF) || // Khmer
+                (c >= 0x0E80 && c <= 0x0EFF) || // Lao
+                (c >= 0x0F00 && c <= 0x0FFF)) { // Tibetan
+                hasClearForeign = true; break;
             }
         }
-        // 如果没有日韩文，且是非常短或无空格的文本，直接视为中文跳过
-        if (!hasKanaHangul) {
+        // 如果没有明确的非中文文字（假名、谚文、西里尔、阿拉伯等），
+        // 但包含 ASCII 拉丁字母（英文单词）→ 一定不是中文
+        if (!hasClearForeign && /[a-zA-Z]/.test(text)) {
+            return false;
+        }
+        // 是非常短或无空格的文本，直接视为中文跳过
+        if (!hasClearForeign) {
             if (text.length < 20 || !/\s/.test(text)) {
                 return true; 
             }
@@ -93,7 +112,8 @@ function isAlreadyChinese(text, node) {
 
         // Japanese kana — 立即返回：日语必定不是中文
         if ((c >= 0x3040 && c <= 0x309F) || (c >= 0x30A0 && c <= 0x30FF) ||
-            (c >= 0x31F0 && c <= 0x31FF) || (c >= 0xFF65 && c <= 0xFF9F)) {
+            (c >= 0x31F0 && c <= 0x31FF) || (c >= 0xFF65 && c <= 0xFF9F) ||
+            c === 0x3005 || (c >= 0x3031 && c <= 0x3035)) {
             return false;
         }
 
@@ -170,7 +190,8 @@ function _isTextChinese(text) {
         meaningful++;
         var cp = ch.codePointAt(0);
         if ((cp >= 0x3040 && cp <= 0x309F) || (cp >= 0x30A0 && cp <= 0x30FF) ||
-            (cp >= 0x31F0 && cp <= 0x31FF) || (cp >= 0xFF65 && cp <= 0xFF9F)) hasKana = true;
+            (cp >= 0x31F0 && cp <= 0x31FF) || (cp >= 0xFF65 && cp <= 0xFF9F) ||
+            cp === 0x3005 || (cp >= 0x3031 && cp <= 0x3035)) hasKana = true;
         else if ((cp >= 0xAC00 && cp <= 0xD7AF) || (cp >= 0x1100 && cp <= 0x11FF) ||
             (cp >= 0x3130 && cp <= 0x318F)) hasHangul = true;
         else if (CJK_RE.test(ch)) cjkCount++;
@@ -251,7 +272,7 @@ function detectSourceLang(text) {
             (c >= 0xC0 && c <= 0x17F && c !== 0xD7 && c !== 0xF7 && c !== 0x17F) ||
             (c >= 0x1A0 && c <= 0x1B0) || (c >= 0x1EA0 && c <= 0x1EF9)) latin++;
         else if ((c >= 0x3040 && c <= 0x30FF) || (c >= 0x31F0 && c <= 0x31FF) ||
-            (c >= 0xFF65 && c <= 0xFF9F)) kana++;
+            (c >= 0xFF65 && c <= 0xFF9F) || c === 0x3005 || (c >= 0x3031 && c <= 0x3035)) kana++;
         else if (c >= 0xAC00 && c <= 0xD7AF) hangul++;
         else if (c >= 0x0400 && c <= 0x052F) cyrillic++;
         else if (c >= 0x0600 && c <= 0x06FF) arabic++;
@@ -268,6 +289,9 @@ function detectSourceLang(text) {
     if (hangul >= 1) return 'ko';
 
     var foreign = latin + kana + hangul + cyrillic + arabic + thai;
+
+    // 无假名但有日本特有文字（々、〱等）→ 日语
+    if (/[\u3005\u3031\u3032\u3033\u3034\u3035]/.test(text) && cjk >= 2) return 'ja';
 
     // 无假名/谚文且检出繁体字
     if (tradCjk >= 1 && cjk >= 2) {

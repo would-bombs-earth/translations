@@ -10,7 +10,7 @@
 
 - **自动翻译**：打开外文网页时自动检测语言并翻译为简体中文，无需手动操作
 - **双引擎切换**：支持微软翻译（免费）和 谷歌翻译（免费），自动故障转移
-- **原地 DOM 翻译**：直接替换页面文本节点和属性（title/alt/placeholder/aria-label），不依赖 iframe 或覆盖层
+- **原地 DOM 翻译**：直接替换页面文本节点和属性（title/alt/placeholder/aria-label/aria-description/aria-roledescription/aria-valuetext/label/value），穿透 SVG Web Components，不依赖 iframe 或覆盖层
 - **划词翻译**：在排除域名、简体中文页面及未被自动翻译过的页面上，选中文本即可弹出翻译浮窗，支持炫酷黑客绿特效、精确中文词性标注和回译
 - **右键菜单**：页面任意位置右键 →「极译此页」/「恢复原文」，一键切换翻译状态
 - **SPA 适配**：自动检测 React/Vue/Angular/Next.js 等框架，延迟等待水合完成，监听路由变化重新翻译
@@ -228,6 +228,15 @@ translations_pro/
 ---
 
 ## 更新日志
+
+### v1.2.2
+
+- **文本全覆盖**：移除 SKIP_TAGS 中的 SVG/INPUT/SELECT 限制，SVG `<text>`、表单按钮标签、下拉选项文本现均可翻译；新增 `aria-description`/`aria-roledescription`/`aria-valuetext`/`label`/`value` 属性的翻译支持。
+- **英文短词漏译修复**：修复 `isAlreadyChinese` 保守模式下英文单词（如 "Premium"）被误判为中文而跳过翻译的问题。
+- **渲染可靠性**：修复 SPA 导航时 `_pendingWrites` 未被清空导致部分译文延迟到返回上一页才显示的问题；修复 `flushPrefetch` 在扩展上下文失效时抛 `Extension context invalidated` 的问题。
+- **性能优化**：`flushQueue` 优先使用 `processTextNode` 已缓存的 `__gtRaw`，避免重复 `normalize(textContent)`。
+- **词典映射**：修复 `lookupWord` 中有道词典 POS 缩写（`n.`/`v.`/`adj.` 等）未映射到中文词性标签的问题。
+- **语言检测**：`isAlreadyChinese`/`_isTextChinese`/`detectSourceLang` 统一补充日文特殊记号（`々`/`〱-〵`）；保守模式扩展非拉丁语系（西里尔/阿拉伯/泰语等）检测。
 
 ### v1.2.1
 

@@ -540,14 +540,14 @@ export async function lookupWord(text) {
         var dict = null;
         if (dRes && dRes.ec && dRes.ec.word && dRes.ec.word[0] && dRes.ec.word[0].trs) {
             dict = [];
+            var POS_MAP = { 'n.':'noun','v.':'verb','vt.':'verb','vi.':'verb','adj.':'adjective','adv.':'adverb','prep.':'preposition','conj.':'conjunction','pron.':'pronoun','interj.':'interjection','art.':'article','num.':'noun','int.':'interjection','pl.':'noun' };
             var trs = dRes.ec.word[0].trs;
             for (var i = 0; i < trs.length; i++) {
                 if (trs[i].tr && trs[i].tr[0] && trs[i].tr[0].l && trs[i].tr[0].l.i && trs[i].tr[0].l.i[0]) {
                     var rawStr = trs[i].tr[0].l.i[0];
-                    // 有道返回的格式通常是 "n. 苹果" 或 "vt. 预订"
                     var posMatch = rawStr.match(/^([a-zA-Z]+\.)\s*(.+)$/);
                     if (posMatch) {
-                        dict.push({ pos: posMatch[1], meanings: [posMatch[2]] });
+                        dict.push({ pos: POS_MAP[posMatch[1]] || posMatch[1], meanings: [posMatch[2]] });
                     } else {
                         dict.push({ pos: "", meanings: [rawStr] });
                     }
