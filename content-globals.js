@@ -8,15 +8,15 @@ var _logThreshold = LOG_LEVEL.INFO;
 var _logBuf = [];
 var LOG_BUF_MAX = 500;
 
-var _S_LOG   = 'background:#3b82f6;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_WARN  = 'background:#f59e0b;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_ERR   = 'background:#ef4444;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_DBG   = 'background:#6b7280;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_API   = 'background:#8b5cf6;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_DOM   = 'background:#ec4899;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_LOG = 'background:#3b82f6;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_WARN = 'background:#f59e0b;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_ERR = 'background:#ef4444;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_DBG = 'background:#6b7280;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_API = 'background:#8b5cf6;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
+var _S_DOM = 'background:#ec4899;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
 var _S_STATE = 'background:#f59e0b;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
 var _S_CACHE = 'background:#2dd4a8;color:#fff;padding:1px 7px;border-radius:3px;font-weight:600';
-var _S_TS    = 'color:#6b7280;font-weight:normal';
+var _S_TS = 'color:#6b7280;font-weight:normal';
 
 function _logWrite(method, tag, args, catStyle) {
     var ts = new Date().toISOString().slice(11, 23);
@@ -34,12 +34,12 @@ function _logWrite(method, tag, args, catStyle) {
     if (_logBuf.length > LOG_BUF_MAX) _logBuf.shift();
 }
 
-var LOG      = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments)); };
-var WARN     = function () { _logWrite('warn', 'W', Array.prototype.slice.call(arguments)); };
-var ERR      = function () { _logWrite('error', 'E', Array.prototype.slice.call(arguments)); };
-var DEBUG    = function () { if (_logThreshold <= LOG_LEVEL.DEBUG) _logWrite('debug', 'D', Array.prototype.slice.call(arguments)); };
-var LOG_API  = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_API); };
-var LOG_DOM  = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_DOM); };
+var LOG = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments)); };
+var WARN = function () { _logWrite('warn', 'W', Array.prototype.slice.call(arguments)); };
+var ERR = function () { _logWrite('error', 'E', Array.prototype.slice.call(arguments)); };
+var DEBUG = function () { if (_logThreshold <= LOG_LEVEL.DEBUG) _logWrite('debug', 'D', Array.prototype.slice.call(arguments)); };
+var LOG_API = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_API); };
+var LOG_DOM = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_DOM); };
 var LOG_STATE = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_STATE); };
 var LOG_CACHE = function () { _logWrite('log', 'I', Array.prototype.slice.call(arguments), _S_CACHE); };
 
@@ -95,13 +95,12 @@ var SKIP_TAGS = new Set([
 
 // ── 调优参数 ──
 var MAX_QUEUE = 200000;
-var BATCH_SIZE = 1024;
-var BATCH_CHARS = 200000; // 大批次 = 更少 API 调用
-var CONCURRENT = 3; // 匹配 background fetch 并发数，加速大批次页面翻译
-var FLUSH_MS = 150; // 延迟打包 DOM 突变，合并为大批次以减少 API 请求数并绕过并发限流
-var HYDRATION_DELAY_MS = 3500; // Twitter/X 等重 SPA 需要更长水合时间
-var INCREMENTAL_THRESHOLD = 8;
-var SOLO_THRESHOLD = 1800; // 超过此长度的文本单独成批（避免标记损坏）
+var BATCH_SIZE = 150;
+var BATCH_CHARS = 4000; // 降低每批字符数，实现真正的增量流式渲染，避免页面长时间等待整体翻译完成
+var CONCURRENT = 5; // 匹配 background fetch 并发数，加速大批次页面翻译
+var FLUSH_MS = 50; // 降低延迟打包等待时间，使滚动或新出现的节点几乎瞬间触发翻译
+var INCREMENTAL_THRESHOLD = 2; // 极大地降低动态节点触发阈值，使新出现的零散弹窗/动态文本能瞬间被送去翻译
+var SOLO_THRESHOLD = 3000; // 超过此长度的文本单独成批（避免大段落导致标记损坏），配合较小的 BATCH_CHARS 可适当调高
 
 // ── 排除域名（跨模块共享：init / SPA 导航检测） ──
 var _excludedDomains = [];

@@ -9,36 +9,6 @@ var _selCache = new Map();
 var _SEL_CACHE_MAX = 50;
 var _selSeq = 0;
 
-// Lazy Translation Observer
-var _ioMap = new WeakMap();
-var _lazyIo = null;
-function getLazyIO() {
-  if (_lazyIo) return _lazyIo;
-  _lazyIo = new IntersectionObserver((entries, observer) => {
-    let triggered = false;
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        const el = entry.target;
-        observer.unobserve(el);
-        const nodes = _ioMap.get(el);
-        if (nodes) {
-          nodes.forEach(n => {
-            if (tMode === 'off') return;
-            if (!queue.has(n)) { queue.add(n); diag.queued++; }
-          });
-          _ioMap.delete(el);
-          triggered = true;
-        }
-      }
-    }
-    if (triggered) {
-      if (!_skipInc) dispatchIncremental();
-      scheduleFlush();
-    }
-  }, { rootMargin: '100% 0px 100% 0px' });
-  return _lazyIo;
-}
-
 // node processing
 
 function enqueueNode(node) {
@@ -192,15 +162,9 @@ function processTextNode(node) {
 
   // Dedup: same text already queued 鈫?track node for later apply
   if (seenText.has(text)) {
+    // still queue so buildBatches can apply from cache after translation
     node.__gtRaw = text;
-    // Lazy queue for seen text
-    if (node.parentElement) {
-      let arr = _ioMap.get(node.parentElement);
-      if (!arr) { arr = []; _ioMap.set(node.parentElement, arr); getLazyIO().observe(node.parentElement); }
-      arr.push(node);
-    } else {
-      queue.add(node);
-    }
+    queue.add(node);
     return;
   }
 
@@ -208,15 +172,9 @@ function processTextNode(node) {
   node.__gt_orig = raw;
   seenAdd(text);
   
-  if (node.parentElement) {
-    let arr = _ioMap.get(node.parentElement);
-    if (!arr) { arr = []; _ioMap.set(node.parentElement, arr); getLazyIO().observe(node.parentElement); }
-    arr.push(node);
-  } else {
-    queue.add(node);
-    diag.queued++;
-    if (!_skipInc) dispatchIncremental();
-  }
+  queue.add(node);
+  diag.queued++;
+  if (!_skipInc) dispatchIncremental();
   
   _dbg('detect', { text });
 }
@@ -244,48 +202,28 @@ function dispatchIncremental() {
   batches.forEach(b => translateBatch(b));
 }
 
-function scanInitial(skipHydration) {
+function scanInitial() {
   if (tMode === 'auto') {
     _pageLangZH = typeof isPageSimplifiedChinese === 'function' ? isPageSimplifiedChinese() : false;
   }
   if (tMode === 'off') return;
-
-  var hasHydration = skipHydration ? false : (
-    !!document.querySelector('#__docusaurus,#__next,#___gatsby,#app,[data-reactroot],[data-react-class]') ||
-    !!(window.__NEXT_DATA__ || window.__NUXT__ || window.__GATSBY__ || window.__REACT_DEVTOOLS_GLOBAL_HOOK__) ||
-    function () {
-      for (var s of document.querySelectorAll('script[src]')) if (/react|next|vue|angular|svelte|docusaurus|nuxt|gatsby/i.test(s.src || s.textContent || '')) return true;
-      return false;
-    }()
-  );
-
-  var delay = hasHydration ? HYDRATION_DELAY_MS : 0;
 
   const doScan = function () {
     if (tMode === 'off') return;
     _skipInc = true;
     var titleEl = document.querySelector('title');
     if (titleEl && titleEl.firstChild && titleEl.firstChild.nodeType === Node.TEXT_NODE) processTextNode(titleEl.firstChild);
-    enqueueNode(document.body);
-    const attrSelector = TRANSLATABLE_ATTRS.map(a => '[' + a + ']').join(',');
-    var els = querySelectorAllDeep(document.body, attrSelector);
-    els.forEach(el => processElementAttrs(el));
+    if (document.body) {
+      enqueueNode(document.body);
+      const attrSelector = TRANSLATABLE_ATTRS.map(a => '[' + a + ']').join(',');
+      var els = querySelectorAllDeep(document.body, attrSelector);
+      els.forEach(el => processElementAttrs(el));
+    }
     scheduleFlush();
     _skipInc = false;
   };
 
-  if (tMode === 'manual') {
-    doScan();
-  } else if (delay > 0) {
-    LOG_DOM('检测到 SPA 框架，延迟' + delay + 'ms 等待水合完成');
-    setTimeout(() => {
-      if (typeof requestIdleCallback === 'function') {
-        requestIdleCallback(doScan, { timeout: 800 });
-      } else {
-        doScan();
-      }
-    }, delay);
-  } else if (typeof requestIdleCallback === 'function') {
+  if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(doScan, { timeout: 200 });
   } else {
     setTimeout(doScan, 0);
@@ -679,6 +617,9 @@ function applyTranslation(node, raw, translated) {
     if (!translatedAttrs.has(el)) translatedAttrs.set(el, new Map());
     translatedAttrs.get(el).set(attr, { raw: raw, translated: cleanAttrVal });
     
+    // Notify MAIN world interceptor
+    el.dispatchEvent(new CustomEvent('gt-orig-attr', { detail: { attr: attr, value: raw } }));
+
     _scheduleWrite(node, cleanAttrVal, raw, true);
     return;
   }
@@ -696,6 +637,9 @@ function applyTranslation(node, raw, translated) {
     }
     origTextMap.set(node, { raw: raw, translated: translatedText });
     
+    // Notify MAIN world interceptor
+    node.dispatchEvent(new CustomEvent('gt-orig-text', { detail: node.__gt_orig }));
+
     _scheduleWrite(node, translatedText, raw, false);
     return;
   }
@@ -943,7 +887,7 @@ function _handleExtensionGone() {
   _stopAndRestore();
 }
 
-async function translatePage(mode, skipHydration) {
+async function translatePage(mode) {
   if (translating) {
     if (mode === 'manual') return { skipped: true, reason: 'busy' };
     // auto-mode SPA re-entry: abort in-flight translations so they don't
@@ -963,7 +907,7 @@ async function translatePage(mode, skipHydration) {
   startObserver();
   LOG('  Observer 已启动');
 
-  scanInitial(skipHydration);
+  scanInitial();
   LOG('  初始扫描已调度（requestIdleCallback），翻译将在浏览器空闲时启动');
 
   if (mode === 'manual') return new Promise(r => { _flR.push(r); }).then(count => ({ success: true, count }));
@@ -1392,7 +1336,7 @@ function onSpaNavigate() {
     //   LOG_STATE('SPA：页面为简体中文，跳过翻译');
     //   return;
     // }
-    translatePage('auto', true).catch(e => ERR('SPA translatePage fails:', e?.message));
+    translatePage('auto').catch(e => ERR('SPA translatePage fails:', e?.message));
   }
 }
 
@@ -1414,6 +1358,63 @@ history.replaceState = function () {
 
 window.addEventListener('popstate', handleSpaUrlChange);
 window.addEventListener('hashchange', handleSpaUrlChange);
+
+// ═══════════════════════════════════════════════════════════
+// Prefetch queue for "Headless" Translation
+// ═══════════════════════════════════════════════════════════
+const prefetchQueue = new Set();
+let prefetchTimer = null;
+
+window.addEventListener('gt-prefetch-text', (e) => {
+  if (tMode === 'off' || !e.detail || !Array.isArray(e.detail)) return;
+  e.detail.forEach(s => prefetchQueue.add(s));
+  if (!prefetchTimer) {
+    prefetchTimer = setTimeout(() => {
+      prefetchTimer = null;
+      flushPrefetch();
+    }, 100);
+  }
+});
+
+function flushPrefetch() {
+  const texts = Array.from(prefetchQueue)
+    .map(s => normalize(s))
+    .filter(s => s && cacheGet(s) === undefined);
+  prefetchQueue.clear();
+  if (texts.length === 0) return;
+
+  const batches = [];
+  let current = [], chars = 0;
+  for (let raw of texts) {
+    const id = uid++;
+    const payload = `${MARK_L}${id}${MARK_R}${raw}`;
+    if (current.length >= BATCH_SIZE || chars + payload.length > BATCH_CHARS) {
+      batches.push(current);
+      current = [];
+      chars = 0;
+    }
+    current.push({ id, raw, payload });
+    chars += payload.length;
+  }
+  if (current.length) batches.push(current);
+
+  batches.forEach(b => {
+    chrome.runtime.sendMessage({
+      action: 'translate',
+      domain: location.hostname,
+      payload: b.map(x => x.payload).join('\n')
+    }, response => {
+      if (response && response.translation) {
+        const resMap = parseTranslated(response.translation);
+        b.forEach(item => {
+          if (resMap.has(item.id)) {
+            cacheSet(item.raw, resMap.get(item.id));
+          }
+        });
+      }
+    });
+  });
+}
 
 (async function init() {
 

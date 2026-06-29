@@ -7,7 +7,7 @@
 // ═══════════════════════════════════════════════════════════
 
 export const MS_LIMIT = 4500;
-export const FETCH_CONCURRENT = 2; // 预翻译 + 常规批次共享队列，避免冲击 5 QPS 限制
+export const FETCH_CONCURRENT = 5; // 预翻译 + 常规批次共享队列，提高并发度加速整页流式翻译
 export const CACHE_MAX = 10000;
 export const CACHE_CLEAN = 1000;
 export const FETCH_COOLDOWN_MS = 900; // 触发限流后冷却时间
@@ -139,7 +139,7 @@ const fetchQueue = [];
 let _lastFetchAt = 0;
 let _fetchPumpScheduled = false;
 let _rateLimitCooldownUntil = 0; // 触发 RequestLimitExceeded 后强制冷却
-const MIN_FETCH_MS = 250; // 250ms = 4 次/秒，留余量防止预翻译+常规批次叠加超限
+const MIN_FETCH_MS = 100; // 100ms = 10 次/秒，降低限制以配合前端更快的并发流式翻译
 
 function enqueueFetch(task) {
     return new Promise((resolve, reject) => {

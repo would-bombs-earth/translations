@@ -143,12 +143,12 @@
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
 | `MAX_QUEUE` | 200000 | 最大翻译队列长度 |
-| `BATCH_SIZE` | 1024 | 每批最多翻译节点数 |
-| `BATCH_CHARS` | 200000 | 每批最多翻译字符数 |
-| `CONCURRENT` | 3 | 并行翻译 worker 数 |
-| `FLUSH_MS` | 0 | 队列刷新防抖延迟 |
+| `BATCH_SIZE` | 150 | 单次批处理节点上限 |
+| `BATCH_CHARS` | 4000 | 每批最多翻译字符数 |
+| `CONCURRENT` | 5 | 并行翻译 worker 数 |
+| `FLUSH_MS` | 50 | 队列刷新防抖延迟 |
 | `HYDRATION_DELAY_MS` | 3500 | SPA 框架水合等待时间 |
-| `INCREMENTAL_THRESHOLD` | 8 | 增量翻译队列触发阈值 |
+| `INCREMENTAL_THRESHOLD` | 2 | 增量翻译队列触发阈值 |
 
 以下参数在 `background-api.js` 中定义：
 
@@ -204,6 +204,7 @@ translations_pro/
 ├── background.js          # Service Worker：右键菜单、消息路由、状态管理、KV 同步
 ├── background-api.js      # 翻译引擎核心：微软/Google API、缓存、并发调度、词典查询
 ├── kv-sync.js             # Cloudflare KV 同步：跨设备排除域名同步（3s 轮询 + 5min 休眠）
+├── dom-hijack.js          # MAIN 世界劫持：拦截 DOM 属性读取与底层 Fetch/XHR 数据，实现预翻译
 ├── content-globals.js     # 共享工具：日志、计数器、DOM 规则、参数配置
 ├── content-lang.js        # 语言检测：零依赖正则引擎、多语言识别
 ├── content.js             # 页面翻译：DOM 遍历、批量翻译、划词弹窗、SPA 适配
@@ -227,6 +228,13 @@ translations_pro/
 ---
 
 ## 更新日志
+
+### v1.2.0
+
+- **无头预翻译 (Headless Pre-translation)**：在 `MAIN` 世界拦截 `Fetch/XHR`，提前提取 JSON 中的潜在文本并异步送翻，实现 SPA 动态渲染时的 0 延迟同步命中缓存体验。
+- **混合语种检测优化**：重写 `detectSourceLang` 逻辑。当检测到“繁体+大量英文”混排时自动交由引擎判定或强制 `en`，解决了 Google 引擎在此类场景下“只做繁转简，不翻英文”的顽疾。
+- **极致增量渲染**：将 `INCREMENTAL_THRESHOLD` 下调至 2，队列防抖降低至 50ms。弹窗、瀑布流新元素的反应速度全面拉满。
+- **水合零等待**：移除了原本由于等待 SPA 框架水合而设置的 `HYDRATION_DELAY_MS` 延迟，依靠底层 API 劫持无缝骗过 React/Vue 的渲染校验。
 
 ### v1.1.1
 

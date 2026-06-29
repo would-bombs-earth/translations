@@ -267,10 +267,17 @@ function detectSourceLang(text) {
     if (kana >= 1) return 'ja';
     if (hangul >= 1) return 'ko';
 
-    // 无假名/谚文且检出繁体字 → 繁体中文字面转简体
-    if (tradCjk >= 1 && cjk >= 2) return 'zh-TW';
-
     var foreign = latin + kana + hangul + cyrillic + arabic + thai;
+
+    // 无假名/谚文且检出繁体字
+    if (tradCjk >= 1 && cjk >= 2) {
+        // 如果英文字符远多于汉字（中英混排且英文为主），不要强制指定 zh-TW，
+        // 否则 Google 会把英文当做“夹杂在中文里的外文名词”而不做翻译。
+        // 直接跳过此判断，让后续逻辑将其识别为 en 等外语。
+        if (latin <= cjk * 2) {
+            return 'zh-TW';
+        }
+    }
     if (foreign < 2) return 'auto';
 
     // CJK 占比高时让 API 自行判断（避免将汉字为主的日文误判为中文）
