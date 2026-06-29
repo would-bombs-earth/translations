@@ -65,6 +65,72 @@ function cacheSet(key, value) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// IndexedDB 永久缓存 (L2)
+// ═══════════════════════════════════════════════════════════
+
+const IDB_NAME = 'TranslationsProDB';
+const IDB_STORE = 'translations';
+const IDB_MAX = 50000;
+let _idbPromise = null;
+
+function getIDB() {
+    if (_idbPromise) return _idbPromise;
+    _idbPromise = new Promise((resolve, reject) => {
+        try {
+            const req = indexedDB.open(IDB_NAME, 1);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(IDB_STORE)) {
+                    const store = db.createObjectStore(IDB_STORE, { keyPath: 'key' });
+                    store.createIndex('ts', 'ts', { unique: false });
+                }
+            };
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror = () => { _idbPromise = null; resolve(null); };
+        } catch (_) { _idbPromise = null; resolve(null); }
+    });
+    return _idbPromise;
+}
+
+async function idbGet(key) {
+    const db = await getIDB();
+    if (!db) return undefined;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).get(key);
+            req.onsuccess = () => resolve(req.result ? req.result.val : undefined);
+            req.onerror = () => resolve(undefined);
+        } catch (_) { resolve(undefined); }
+    });
+}
+
+async function idbSet(key, val) {
+    const db = await getIDB();
+    if (!db) return;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            const store = tx.objectStore(IDB_STORE);
+            store.put({ key, val, ts: Date.now() });
+            tx.oncomplete = () => {
+                // 容量控制: 简单随机/批量清理（避免复杂的游标删除影响性能）
+                try {
+                    const tx2 = db.transaction(IDB_STORE, 'readwrite');
+                    const store2 = tx2.objectStore(IDB_STORE);
+                    const countReq = store2.count();
+                    countReq.onsuccess = () => {
+                        if (countReq.result > IDB_MAX) store2.clear();
+                    };
+                } catch (_) {}
+                resolve();
+            };
+            tx.onerror = () => resolve();
+        } catch (_) { resolve(); }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
 // fetch 并发调度
 // ═══════════════════════════════════════════════════════════
 
@@ -578,6 +644,12 @@ export async function google(text, sl = 'auto', domain = '', tabId = null, group
         return { translation: cached, engine: '(cache)' };
     }
 
+    const idbCached = await idbGet(cacheKey);
+    if (idbCached !== undefined) {
+        cacheSet(cacheKey, idbCached); // 回填到内存
+        return { translation: idbCached, engine: '(idb)' };
+    }
+
     const { selectedEngine } = await chrome.storage.local.get('selectedEngine');
     let engine = selectedEngine || 'google';
 
@@ -603,7 +675,10 @@ export async function google(text, sl = 'auto', domain = '', tabId = null, group
         throw new Error('all endpoints failed');
     }
 
-    cacheSet(cacheKey, result.translation);
+    if (result && result.translation) {
+        cacheSet(cacheKey, result.translation);
+        idbSet(cacheKey, result.translation).catch(() => {});
+    }
     return { translation: result.translation, engine: engine };
 }
 

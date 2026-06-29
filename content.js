@@ -9,6 +9,36 @@ var _selCache = new Map();
 var _SEL_CACHE_MAX = 50;
 var _selSeq = 0;
 
+// Lazy Translation Observer
+var _ioMap = new WeakMap();
+var _lazyIo = null;
+function getLazyIO() {
+  if (_lazyIo) return _lazyIo;
+  _lazyIo = new IntersectionObserver((entries, observer) => {
+    let triggered = false;
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const el = entry.target;
+        observer.unobserve(el);
+        const nodes = _ioMap.get(el);
+        if (nodes) {
+          nodes.forEach(n => {
+            if (tMode === 'off') return;
+            if (!queue.has(n)) { queue.add(n); diag.queued++; }
+          });
+          _ioMap.delete(el);
+          triggered = true;
+        }
+      }
+    }
+    if (triggered) {
+      if (!_skipInc) dispatchIncremental();
+      scheduleFlush();
+    }
+  }, { rootMargin: '100% 0px 100% 0px' });
+  return _lazyIo;
+}
+
 // node processing
 
 function enqueueNode(node) {
@@ -162,18 +192,32 @@ function processTextNode(node) {
 
   // Dedup: same text already queued 鈫?track node for later apply
   if (seenText.has(text)) {
-    // still queue so buildBatches can apply from cache after translation
     node.__gtRaw = text;
-    queue.add(node);
+    // Lazy queue for seen text
+    if (node.parentElement) {
+      let arr = _ioMap.get(node.parentElement);
+      if (!arr) { arr = []; _ioMap.set(node.parentElement, arr); getLazyIO().observe(node.parentElement); }
+      arr.push(node);
+    } else {
+      queue.add(node);
+    }
     return;
   }
 
   node.__gtRaw = text;
   node.__gt_orig = raw;
   seenAdd(text);
-  queue.add(node);
-  diag.queued++;
-  if (!_skipInc) dispatchIncremental();
+  
+  if (node.parentElement) {
+    let arr = _ioMap.get(node.parentElement);
+    if (!arr) { arr = []; _ioMap.set(node.parentElement, arr); getLazyIO().observe(node.parentElement); }
+    arr.push(node);
+  } else {
+    queue.add(node);
+    diag.queued++;
+    if (!_skipInc) dispatchIncremental();
+  }
+  
   _dbg('detect', { text });
 }
 
