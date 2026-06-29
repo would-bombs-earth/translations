@@ -229,6 +229,11 @@ translations_pro/
 
 ## 更新日志
 
+### v1.2.3
+
+- **体验优化**：为划词翻译的弹窗增加了顶部拖动把手，现在可以通过鼠标按住弹窗顶部自由拖拽。
+- **性能优化**：重构了底层的词典接口调用逻辑，解除不必要的引擎等待。有道词典查询成功时实现“秒出”响应，极大提升了划词体验。
+
 ### v1.2.2
 
 - **文本全覆盖**：移除 SKIP_TAGS 中的 SVG/INPUT/SELECT 限制，SVG `<text>`、表单按钮标签、下拉选项文本现均可翻译；新增 `aria-description`/`aria-roledescription`/`aria-valuetext`/`label`/`value` 属性的翻译支持。

@@ -1071,6 +1071,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ── 划词翻译（排除域名 / 自动翻译关闭时生效）──
 
+var _selPopupDragHandler = null;
+var _selPopupMoveHandler = null;
+var _selPopupUpHandler = null;
+
 function closeSelPopup() {
   if (_selPopup) {
     _selPopup.remove();
@@ -1079,6 +1083,14 @@ function closeSelPopup() {
   if (_selOutsideHandler) {
     document.removeEventListener('mousedown', _selOutsideHandler);
     _selOutsideHandler = null;
+  }
+  if (_selPopupMoveHandler) {
+    document.removeEventListener('mousemove', _selPopupMoveHandler);
+    _selPopupMoveHandler = null;
+  }
+  if (_selPopupUpHandler) {
+    document.removeEventListener('mouseup', _selPopupUpHandler);
+    _selPopupUpHandler = null;
   }
 }
 
@@ -1246,9 +1258,52 @@ function showSelPopup(rawText, transText, dictData) {
   popup.style.left = left + 'px';
   popup.style.top = top + 'px';
 
+  // 增加鼠标拖动支持
+  var dragHandle = document.createElement('div');
+  dragHandle.style.cssText =
+    'position:absolute;top:0;left:0;right:0;height:16px;cursor:move;' +
+    'background:transparent;z-index:2;';
+  var dragLine = document.createElement('div');
+  dragLine.style.cssText =
+    'width:32px;height:4px;border-radius:2px;background:rgba(255,255,255,0.15);' +
+    'margin:6px auto 0;transition:background 0.2s;';
+  dragHandle.onmouseenter = function() { dragLine.style.background = 'rgba(255,255,255,0.3)'; };
+  dragHandle.onmouseleave = function() { dragLine.style.background = 'rgba(255,255,255,0.15)'; };
+  dragHandle.appendChild(dragLine);
+  popup.appendChild(dragHandle);
+
+  var isDragging = false;
+  var dragOffsetX = 0, dragOffsetY = 0;
+
+  _selPopupDragHandler = function (e) {
+    isDragging = true;
+    dragOffsetX = e.clientX - popup.getBoundingClientRect().left;
+    dragOffsetY = e.clientY - popup.getBoundingClientRect().top;
+    popup.style.transition = 'none';
+    e.preventDefault();
+  };
+  dragHandle.addEventListener('mousedown', _selPopupDragHandler);
+
+  _selPopupMoveHandler = function (e) {
+    if (!isDragging) return;
+    popup.style.left = (e.clientX - dragOffsetX) + 'px';
+    popup.style.top = (e.clientY - dragOffsetY) + 'px';
+  };
+
+  _selPopupUpHandler = function (e) {
+    if (isDragging) {
+      isDragging = false;
+      popup.style.transition = 'opacity 0.15s ease-out, transform 0.15s ease-out';
+    }
+  };
+
+  document.addEventListener('mousemove', _selPopupMoveHandler);
+  document.addEventListener('mouseup', _selPopupUpHandler);
+
   _selOutsideHandler = function (e) {
     if (!popup.contains(e.target)) closeSelPopup();
   };
+  // Use mousedown for outside click, but ensure it doesn't trigger immediately during current mousedown
   setTimeout(function () { document.addEventListener('mousedown', _selOutsideHandler); }, 0);
 }
 

@@ -528,14 +528,15 @@ export async function lookupWord(text) {
     }
 
     try {
-        var pTranslate = quickTranslate(clean);
-        var pDict = fetch('https://dict.youdao.com/jsonapi?q=' + encodeURIComponent(clean))
+        var pTranslate = quickTranslate(clean).catch(function() { return { translation: '' }; });
+        var ctrl = new AbortController();
+        var timer = setTimeout(function() { ctrl.abort(); }, 1200);
+        var pDict = fetch('https://dict.youdao.com/jsonapi?q=' + encodeURIComponent(clean), { signal: ctrl.signal })
             .then(function(res) { return res.json(); })
-            .catch(function() { return null; });
+            .catch(function() { return null; })
+            .finally(function() { clearTimeout(timer); });
 
-        var results = await Promise.all([pTranslate, pDict]);
-        var tRes = results[0];
-        var dRes = results[1];
+        var dRes = await pDict;
 
         var dict = null;
         var youdaoMeanings = [];
@@ -559,10 +560,12 @@ export async function lookupWord(text) {
             if (dict.length === 0) dict = null;
         }
 
-        var translation = youdaoMeanings.length > 0
-            ? youdaoMeanings.join('；')
-            : (tRes.translation || clean);
-        return { translation: translation, dict: dict };
+        if (youdaoMeanings.length > 0) {
+            return { translation: youdaoMeanings.join('；'), dict: dict };
+        }
+
+        var tRes = await pTranslate;
+        return { translation: (tRes && tRes.translation) ? tRes.translation : clean, dict: dict };
     } catch (e) {
         return { translation: clean, dict: null };
     }
