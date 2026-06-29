@@ -229,13 +229,10 @@ translations_pro/
 
 ## 更新日志
 
-### v1.2.1
+### v1.1.1
 
 - **Bug 修复**：修复了无头预翻译中消息发送类型不匹配导致控制台报出 `Unchecked runtime.lastError` 错误的问题。
 - **稳定性**：在 `background.js` 增加消息处理的全局兜底，避免未知消息卡死端口导致异常。
-
-### v1.2.0
-
 - **无头预翻译 (Headless Pre-translation)**：在 `MAIN` 世界拦截 `Fetch/XHR`，提前提取 JSON 中的潜在文本并异步送翻，实现 SPA 动态渲染时的 0 延迟同步命中缓存体验。
 - **混合语种检测优化**：重写 `detectSourceLang` 逻辑。当检测到“繁体+大量英文”混排时自动交由引擎判定或强制 `en`，解决了 Google 引擎在此类场景下“只做繁转简，不翻英文”的顽疾。
 - **极致增量渲染**：将 `INCREMENTAL_THRESHOLD` 下调至 2，队列防抖降低至 50ms。弹窗、瀑布流新元素的反应速度全面拉满。
