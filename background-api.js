@@ -12,6 +12,45 @@ export const CACHE_MAX = 10000;
 export const CACHE_CLEAN = 1000;
 export const FETCH_COOLDOWN_MS = 900; // 触发限流后冷却时间
 
+// ═══════════════════════════════════════════════════════════
+// 双引擎调度状态
+// ═══════════════════════════════════════════════════════════
+
+const _engineCD = { google: 0, microsoft: 0, google_basic: 0 };
+const _engineBusy = { google: 0, microsoft: 0, google_basic: 0 };
+
+function _markEngineCooldown(engine) {
+  _engineCD[engine] = Date.now() + FETCH_COOLDOWN_MS;
+  LOG(`引擎冷却: ${engine} ${FETCH_COOLDOWN_MS}ms`);
+}
+
+function _pickEngine(prefer) {
+  const now = Date.now();
+  const gAvail = _engineCD.google <= now;
+  const mAvail = _engineCD.microsoft <= now;
+  const bAvail = _engineCD.google_basic <= now;
+
+  const avail = [];
+  if (gAvail) avail.push('google');
+  if (mAvail) avail.push('microsoft');
+  if (bAvail) avail.push('google_basic');
+
+  if (avail.length === 0) {
+    return Object.keys(_engineCD).sort((a, b) => _engineCD[a] - _engineCD[b])[0];
+  }
+
+  if (avail.length === 1) return avail[0];
+
+  if (prefer && avail.includes(prefer) && _engineBusy[prefer] === 0) return prefer;
+
+  avail.sort((a, b) => {
+    const d = _engineBusy[a] - _engineBusy[b];
+    if (d !== 0) return d;
+    return a < b ? -1 : 1;
+  });
+  return avail[0];
+}
+
 export const MARK_L = '\u27EA';
 export const MARK_R = '\u27EB';
 
@@ -129,6 +168,19 @@ async function idbSet(key, val) {
         } catch (_) { resolve(); }
     });
 }
+async function idbDel(key) {
+    const db = await getIDB();
+    if (!db) return;
+    return new Promise(resolve => {
+        try {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).delete(key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+        } catch (_) { resolve(); }
+    });
+}
+
 
 // ═══════════════════════════════════════════════════════════
 // fetch 并发调度
@@ -138,7 +190,6 @@ let activeFetches = 0;
 const fetchQueue = [];
 let _lastFetchAt = 0;
 let _fetchPumpScheduled = false;
-let _rateLimitCooldownUntil = 0; // 触发 RequestLimitExceeded 后强制冷却
 const MIN_FETCH_MS = 100; // 100ms = 10 次/秒，降低限制以配合前端更快的并发流式翻译
 
 function enqueueFetch(task) {
@@ -148,24 +199,7 @@ function enqueueFetch(task) {
     });
 }
 
-function _setRateLimitCooldown() {
-    _rateLimitCooldownUntil = Date.now() + FETCH_COOLDOWN_MS;
-    LOG('触发限流冷却，暂停 ' + FETCH_COOLDOWN_MS + 'ms');
-}
-
 function pumpFetchQueue() {
-    if (_rateLimitCooldownUntil > Date.now()) {
-        // 仍在冷却期，延迟重试
-        if (!_fetchPumpScheduled) {
-            _fetchPumpScheduled = true;
-            setTimeout(() => {
-                _fetchPumpScheduled = false;
-                pumpFetchQueue();
-            }, 200);
-        }
-        return;
-    }
-
     if (activeFetches >= FETCH_CONCURRENT) return;
     if (fetchQueue.length === 0) return;
 
@@ -190,14 +224,7 @@ function pumpFetchQueue() {
     Promise.resolve()
         .then(() => item.task())
         .then(result => { item.resolve(result); })
-        .catch(e => {
-            // 检测到限流错误 → 触发冷却
-            var msg = e?.message || String(e);
-            if (msg.indexOf('RequestLimitExceeded') !== -1) {
-                _setRateLimitCooldown();
-            }
-            item.reject(e);
-        })
+        .catch(e => { item.reject(e); })
         .finally(() => {
             activeFetches--;
             pumpFetchQueue();
@@ -575,23 +602,20 @@ export async function lookupWord(text) {
 // 轻量划词翻译 — 绕过 google() 全量流水线，直接 fetch
 // ═══════════════════════════════════════════════════════════
 export async function quickTranslate(text) {
-    var clean = sanitizeText(text);
+    var clean = sanitizeText(text.trim());
     if (!clean) return { translation: '' };
 
-    for (var retry = 0; retry < 2; retry++) {
+    try {
+        var translation = await _googleBatchexecuteRequest(clean, 'auto');
+        return { translation: translation };
+    } catch (e) {
         try {
-            var translation = await _googleBatchexecuteRequest(clean, 'auto');
-            return { translation: translation };
-        } catch (e) {
-            if (e.status === 429) {
-                if (retry < 1) { await new Promise(function (r) { setTimeout(r, 300); }); continue; }
-                return { translation: '' };
-            }
-            if (retry >= 1) return { translation: '' };
-            await new Promise(function (r) { setTimeout(r, 100); });
+            var gbasic = await translateViaGoogleBasic(clean, 'auto');
+            return { translation: gbasic.translation };
+        } catch (ebasic) {
+            return { translation: '' };
         }
     }
-    return { translation: '' };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -619,26 +643,124 @@ function _detectSlFromText(text) {
 // 引擎路由
 // ═══════════════════════════════════════════════════════════
 
-async function translateViaEngine(text, sl, engine) {
-    if (engine === 'microsoft') {
-        const res = await translateViaMicrosoft(text, sl);
-        return { translation: res.translation, engine: 'microsoft' };
-    }
-    if (engine === 'google') {
-        // batchexecute 接口能够很好地保留 ⟪⟫ 标记，无需再切碎为几十个短句发送，避免触发 Google 400/429 风控
-        const gres = await translateViaGoogle(text, sl);
-        var gsingle = gres.translation || '';
-        
-        // 修复引擎可能在标记周围添加的空格
-        gsingle = gsingle.replace(/⟪\s*(\d+)\s*⟫/g, '⟪$1⟫');
-
-        if (gsingle && !/[一-鿿]/.test(gsingle) && text && /[a-zA-Z]{3,}/.test(text)) {
-            // Google failed to translate (returned original text)
-            throw new Error('Google batchexecute returned no Chinese characters (Neural MT fallback issue)');
+async function translateViaGoogleBasic(text, sl) {
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + (sl === 'auto' ? 'auto' : sl) + '&tl=zh-CN&dt=t&q=' + encodeURIComponent(text);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException('timeout', 'TimeoutError')), 3000);
+    try {
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error('Google Basic HTTP ' + res.status);
+        const data = await res.json();
+        let translated = '';
+        if (data && data[0]) {
+            data[0].forEach(item => {
+                if (item && item[0]) translated += item[0];
+            });
         }
-        return { translation: gsingle, engine: 'google' };
+        if (!translated) throw new Error('Google Basic empty');
+        return { translation: translated };
+    } finally {
+        clearTimeout(timer);
     }
-    throw new Error('Unknown engine: ' + engine);
+}
+
+function parseMarkers(text) {
+    const result = new Map();
+    const regex = new RegExp(
+        MARK_L + '(\\d+)' + MARK_R + '?([\\s\\S]*?)(?=' + MARK_L + '\\d+' + MARK_R + '?|$)',
+        'g'
+    );
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        result.set(parseInt(match[1], 10), match[2].trim());
+    }
+    return result;
+}
+
+async function translateViaEngine(text, sl, engine) {
+    _engineBusy[engine] = (_engineBusy[engine] || 0) + 1;
+    try {
+      if (engine === 'microsoft') {
+          const res = await translateViaMicrosoft(text, sl);
+          return { translation: res.translation, engine: 'microsoft' };
+      }
+      if (engine === 'google_basic') {
+          const res = await translateViaGoogleBasic(text, sl);
+          return { translation: res.translation, engine: 'google_basic' };
+      }
+      if (engine === 'google') {
+          const gres = await translateViaGoogle(text, sl);
+          var gsingle = gres.translation || '';
+          gsingle = gsingle.replace(/⟪\s*(\d+)\s*⟫/g, '⟪$1⟫');
+
+          const rawMap = parseMarkers(text);
+          const transMap = parseMarkers(gsingle);
+          let mutatedAny = false;
+
+          if (rawMap.size > 0 && transMap.size > 0) {
+              for (const [id, rawVal] of rawMap.entries()) {
+                  const transVal = transMap.get(id) || '';
+                  if (rawVal && /[a-zA-Z]{3,}/.test(rawVal) && (!transVal || !/[一-鿿]/.test(transVal))) {
+                      LOG('检测到批次内单项拒译:', rawVal.slice(0, 50));
+                      try {
+                          const mutatedText = rawVal.replace(/[\(\)\[\]]/g, '') + '.';
+                          const gresMutated = await translateViaGoogle(mutatedText, sl);
+                          let mutatedTrans = gresMutated.translation || '';
+                          mutatedTrans = mutatedTrans.replace(/⟪\s*(\d+)\s*⟫/g, '⟪$1⟫');
+                          mutatedTrans = mutatedTrans.replace(new RegExp(MARK_L + '\\d+' + MARK_R, 'g'), '');
+                          
+                          if (mutatedTrans && /[一-鿿]/.test(mutatedTrans)) {
+                              mutatedTrans = mutatedTrans.replace(/。$/, '').trim();
+                              transMap.set(id, mutatedTrans);
+                              mutatedAny = true;
+                              LOG('✅ 批次内单项变异重试成功:', mutatedTrans.slice(0, 50));
+                          }
+                      } catch (e) {
+                          ERR('批次内单项变异重试失败:', e?.message);
+                      }
+                  }
+              }
+              if (mutatedAny) {
+                  const reconstructed = [];
+                  for (const [id, transVal] of transMap.entries()) {
+                      reconstructed.push(`${MARK_L}${id}${MARK_R}${transVal}`);
+                  }
+                  gsingle = reconstructed.join('\n');
+              }
+          } else {
+              if (gsingle && !/[一-鿿]/.test(gsingle) && text && /[a-zA-Z]{3,}/.test(text)) {
+                  LOG('触发 Neural MT 拒译，尝试移除括号变异重试...');
+                  const mutatedText = text.replace(/[\(\)\[\]]/g, '') + '.';
+                  const gresMutated = await translateViaGoogle(mutatedText, sl);
+                  var gsingleMutated = gresMutated.translation || '';
+                  gsingleMutated = gsingleMutated.replace(/⟪\s*(\d+)\s*⟫/g, '⟪$1⟫');
+                  
+                  if (gsingleMutated && /[一-鿿]/.test(gsingleMutated)) {
+                      gsingleMutated = gsingleMutated.replace(/。$/, '');
+                      LOG('✅ 变异重试成功：', gsingleMutated.slice(0, 50));
+                      return { translation: gsingleMutated, engine: 'google' };
+                  }
+                  
+                  throw new Error('Google batchexecute returned no Chinese characters (Neural MT fallback issue)');
+              }
+          }
+          return { translation: gsingle, engine: 'google' };
+      }
+      throw new Error('Unknown engine: ' + engine);
+    } catch (e) {
+      if (e?.status === 429 || String(e?.message || '').includes('429')) {
+          _markEngineCooldown('google');
+      }
+      if (String(e?.message || '').includes('MS HTTP')) {
+          _markEngineCooldown('microsoft');
+      }
+      if (String(e?.message || '').includes('Google Basic')) {
+          _markEngineCooldown('google_basic');
+      }
+      throw e;
+    } finally {
+      _engineBusy[engine] = Math.max(0, (_engineBusy[engine] || 1) - 1);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -651,41 +773,48 @@ export async function google(text, sl = 'auto', domain = '', tabId = null, group
 
     const cached = cacheGet(cacheKey);
     if (cached !== undefined) {
-        return { translation: cached, engine: '(cache)' };
+        // 自愈机制：如果缓存内容与原文相同，或者对于含有英文词的原文缓存中没有任何中文，判定为损坏缓存
+        if (cached === clean || (!/[一-鿿]/.test(cached) && /[a-zA-Z]{3,}/.test(clean))) {
+            translationCache.delete(cacheKey);
+        } else {
+            return { translation: cached, engine: '(cache)' };
+        }
     }
 
     const idbCached = await idbGet(cacheKey);
     if (idbCached !== undefined) {
-        cacheSet(cacheKey, idbCached); // 回填到内存
-        return { translation: idbCached, engine: '(idb)' };
+        if (idbCached === clean || (!/[一-鿿]/.test(idbCached) && /[a-zA-Z]{3,}/.test(clean))) {
+            idbDel(cacheKey).catch(() => {});
+        } else {
+            cacheSet(cacheKey, idbCached); // 回填到内存
+            return { translation: idbCached, engine: '(idb)' };
+        }
     }
 
     const { selectedEngine } = await chrome.storage.local.get('selectedEngine');
-    let engine = selectedEngine || 'google';
+    const prefer = selectedEngine && selectedEngine !== 'dual' ? selectedEngine : null;
+    const allEngines = ['google', 'microsoft', 'google_basic'];
+    const engineOrder = prefer && allEngines.includes(prefer)
+      ? [prefer, ...allEngines.filter(e => e !== prefer)]
+      : allEngines;
 
     let result = null;
-    try {
-        result = await translateWithChunking(clean, sl, engine);
-    } catch (e) {
-        ERR(engine + ' 翻译失败:', e?.message || String(e));
-
-        // 自动降级链: google → microsoft
-        var fallback = engine === 'google' ? 'microsoft' : 'google';
-        LOG(engine + ' 失败 → 降级到 ' + fallback);
-        try {
-            result = await translateWithChunking(clean, sl, fallback);
-            engine = fallback;
-        } catch (e2) {
-            ERR('降级也失败:', e2?.message || String(e2));
-            result = null;
-        }
+    let engine = engineOrder[0];
+    for (const eng of engineOrder) {
+      if (_engineCD[eng] > Date.now()) continue;
+      try {
+        result = await translateWithChunking(clean, sl, eng);
+        if (result?.translation) { engine = eng; break; }
+      } catch (e) {
+        LOG(`⚡ ${eng} 失败:`, e?.message || String(e));
+      }
     }
 
     if (!result?.translation) {
         throw new Error('all endpoints failed');
     }
 
-    if (result && result.translation) {
+    if (result.translation) {
         cacheSet(cacheKey, result.translation);
         idbSet(cacheKey, result.translation).catch(() => {});
     }
@@ -697,7 +826,7 @@ async function translateWithChunking(text, sl, engine) {
     var processed = (engine === 'google' || engine === 'microsoft') ? preprocessForEngine(text) : text;
 
     // Google / 微软引擎：使用标记文本分块
-    var limit = engine === 'google' ? MS_LIMIT : MS_LIMIT; // Google batchexecute 支持更大分块，统一使用 4500
+    var limit = MS_LIMIT;
     var chunks = splitMarkerChunks(processed, limit);
     if (chunks.length === 1) {
         return await enqueueFetch(() => translateViaEngine(chunks[0], sl, engine));

@@ -14,6 +14,24 @@ const latencyMS = $('latencyMS');
 const latencyGG = $('latencyGG');
 const netError = $('netError');
 
+// Moved to top to avoid TDZ ReferenceErrors
+const cfApiTokenInput = $('cfApiToken');
+const cfAccountIdInput = $('cfAccountId');
+const cfNamespaceIdInput = $('cfNamespaceId');
+const kvCfgExportBtn = $('kvCfgExport');
+const kvCfgImportBtn = $('kvCfgImport');
+const kvCfgImportInput = $('kvCfgImportInput');
+const kvStatusBadge = $('kvStatusBadge');
+const kvSyncBox = $('kvSyncBox');
+const kvSyncHeader = $('kvSyncHeader');
+
+const domainInput = $('domainInput');
+const domainClear = $('domainClear');
+const domainList = $('domainList');
+const domainCount = $('domainCount');
+const domainAdd = $('domainAdd');
+const domainAddCurrent = $('domainAddCurrent');
+
 let selectedEngine = 'google';
 
 let currentTabId = null;
@@ -166,15 +184,7 @@ cardGG.addEventListener('click', () => selectEngine('google'));
 // ── KV 配置 (保存/读取) ──
 // ══════════════════════════════════════════════════════
 
-const cfApiTokenInput = $('cfApiToken');
-const cfAccountIdInput = $('cfAccountId');
-const cfNamespaceIdInput = $('cfNamespaceId');
-const kvCfgExportBtn = $('kvCfgExport');
-const kvCfgImportBtn = $('kvCfgImport');
-const kvCfgImportInput = $('kvCfgImportInput');
-const kvStatusBadge = $('kvStatusBadge');
-const kvSyncBox = $('kvSyncBox');
-const kvSyncHeader = $('kvSyncHeader');
+
 
 
 async function loadKvConfig() {
@@ -504,12 +514,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ── 域名管理 ──
 // ══════════════════════════════════════════════════════
 
-const domainInput = $('domainInput');
-const domainClear = $('domainClear');
-const domainList = $('domainList');
-const domainCount = $('domainCount');
-const domainAdd = $('domainAdd');
-const domainAddCurrent = $('domainAddCurrent');
+
 
 let domains = [];
 let currentDomain = '';

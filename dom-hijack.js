@@ -84,8 +84,9 @@
   const origGetAttribute = Element.prototype.getAttribute;
   Element.prototype.getAttribute = function(name) {
     const attrs = origAttrMap.get(this);
-    if (attrs && attrs.has(name)) {
-      return attrs.get(name);
+    const lowerName = typeof name === 'string' ? name.toLowerCase() : name;
+    if (attrs && attrs.has(lowerName)) {
+      return attrs.get(lowerName);
     }
     return origGetAttribute.call(this, name);
   };
@@ -94,7 +95,8 @@
   Element.prototype.setAttribute = function(name, value) {
     const attrs = origAttrMap.get(this);
     if (attrs) {
-      attrs.delete(name);
+      const lowerName = typeof name === 'string' ? name.toLowerCase() : name;
+      attrs.delete(lowerName);
     }
     return origSetAttribute.call(this, name, value);
   };
@@ -146,6 +148,10 @@
           if (/^[0-9a-fA-F\-]{20,}$/.test(s)) return;
           if (/^[A-Za-z0-9+/=]{40,}$/.test(s)) return;
           if (/^[^a-zA-Z0-9\u4e00-\u9fa5]+$/.test(s)) return;
+          // Reject SVG paths (start with M/m followed by digits, high digit density)
+          if (/^[Mm]\s*-?\d+/.test(s) && (s.match(/[0-9]/g) || []).length > s.length * 0.3) return;
+          // Reject CSS/code blocks
+          if (s.includes('{') || s.includes('}') || s.includes(';')) return;
           strings.add(s);
         }
       } else if (Array.isArray(node)) {
@@ -182,8 +188,7 @@
       const type = this.responseType;
       if (type === '' || type === 'text' || type === 'json') {
         try {
-          const text = type === 'json' ? JSON.stringify(this.response) : this.responseText;
-          const json = JSON.parse(text);
+          const json = type === 'json' ? this.response : JSON.parse(this.responseText);
           extractAndPrefetch(json);
         } catch (e) {}
       }

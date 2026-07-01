@@ -98,7 +98,7 @@ var MAX_QUEUE = 200000;
 var BATCH_SIZE = 150;
 var BATCH_CHARS = 4000; // 降低每批字符数，实现真正的增量流式渲染，避免页面长时间等待整体翻译完成
 var CONCURRENT = 5; // 匹配 background fetch 并发数，加速大批次页面翻译
-var FLUSH_MS = 20; // 降低延迟打包等待时间，使滚动或新出现的节点几乎瞬间触发翻译
+var FLUSH_MS = 1; // 1ms 打包等待，使新节点几乎立即触发翻译
 var INCREMENTAL_THRESHOLD = 2; // 极大地降低动态节点触发阈值，使新出现的零散弹窗/动态文本能瞬间被送去翻译
 var SOLO_THRESHOLD = 3000; // 超过此长度的文本单独成批（避免大段落导致标记损坏），配合较小的 BATCH_CHARS 可适当调高
 

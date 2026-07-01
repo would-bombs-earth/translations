@@ -234,11 +234,7 @@ function scanInitial() {
     _skipInc = false;
   };
 
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(doScan, { timeout: 50 });
-  } else {
-    setTimeout(doScan, 0);
-  }
+  setTimeout(doScan, 0);
 }
 
 // Shared mutation handler used for both main DOM and shadow-root observers
@@ -575,10 +571,8 @@ function _flushWrites() {
   _rafScheduled = false;
   if (_pendingWrites.length === 0) return;
   _muteDepth++;
-  
-  const start = performance.now();
-  let i = 0;
-  
+  const t0 = performance.now();
+  var i = 0;
   try {
     for (; i < _pendingWrites.length; i++) {
       var w = _pendingWrites[i];
@@ -587,22 +581,18 @@ function _flushWrites() {
       } else {
         w.node.textContent = w.text;
       }
-      
-      // 每处理 50 个节点检查一次耗时，如果超过 8ms，则打断循环，将控制权还给浏览器渲染线程
-      if (i % 50 === 0 && performance.now() - start > 8) {
-        i++; // 确保下次从下一个节点开始
+      if ((i & 31) === 31 && performance.now() - t0 > 10) {
+        i++;
         break;
       }
     }
   } finally {
     _muteDepth--;
     if (i < _pendingWrites.length) {
-      // 还有未写完的节点，保留剩余任务，在下一帧继续写
       _pendingWrites = _pendingWrites.slice(i);
       _rafScheduled = true;
       requestAnimationFrame(_flushWrites);
     } else {
-      // 全部写完
       _pendingWrites.length = 0;
     }
   }
@@ -610,7 +600,6 @@ function _flushWrites() {
 
 function _scheduleWrite(node, text, raw, isAttr) {
   if (tMode === 'manual') {
-    // Manual mode requires synchronous write so UI can verify it immediately
     _muteDepth++;
     try {
       if (isAttr) {
@@ -1463,7 +1452,15 @@ window.addEventListener('gt-prefetch-text', (e) => {
 function flushPrefetch() {
   const texts = Array.from(prefetchQueue)
     .map(s => normalize(s))
-    .filter(s => s && cacheGet(s) === undefined);
+    .filter(s => {
+      if (!s || s.length < 2) return false;
+      if (s.length < 5 && /^[\p{P}\p{S}\s]+$/u.test(s)) return false;
+      if (SKIP_COMBINED_RE.test(s)) return false;
+      if (isAlreadyChinese(s)) return false;
+      if (isAsciiNonText(s)) return false;
+      if (_isUiBrandName(s)) return false;
+      return cacheGet(s) === undefined;
+    });
   prefetchQueue.clear();
   if (texts.length === 0) return;
 
